@@ -1,0 +1,21 @@
+services:
+  init-clickhouse:
+    platform: linux/arm64
+
+  zookeeper:
+    platform: linux/arm64
+
+  clickhouse:
+    platform: linux/arm64
+
+  signoz:
+    platform: linux/arm64
+
+  signoz-telemetrystore-migrator:
+    platform: linux/arm64
+
+  otel-collector:
+    platform: linux/arm64
+
+  telegram-bridge:
+    platform: linux/arm64
