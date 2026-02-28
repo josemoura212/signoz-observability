@@ -1,0 +1,26 @@
+services:
+  otel-agent:
+    image: otel/opentelemetry-collector-contrib:${OTELCOL_CONTRIB_VERSION:-0.146.0}
+    container_name: otel-agent-kafka
+    restart: unless-stopped
+    command: ['--config=/etc/otel/config.yaml']
+    volumes:
+      - ./otel-agent-config.yaml:/etc/otel/config.yaml
+      - /:/hostfs:ro
+    ports:
+      - '4317:4317'
+      - '4318:4318'
+    environment:
+      HOST_PROC: /hostfs/proc
+      HOST_SYS: /hostfs/sys
+      HOST_ETC: /hostfs/etc
+      HOST_VAR: /hostfs/var
+      SIGNOZ_ENDPOINT: ${SIGNOZ_ENDPOINT}
+      KAFKA_BROKERS: ${KAFKA_BROKERS:-localhost:9092}
+    extra_hosts:
+      - 'host.docker.internal:host-gateway'
+    pid: host
+    logging:
+      options:
+        max-size: '20m'
+        max-file: '3'

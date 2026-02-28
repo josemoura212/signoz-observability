@@ -1,0 +1,81 @@
+receivers:
+  redis:
+    endpoint: ${env:REDIS_ENDPOINT}
+    collection_interval: 60s
+    metrics:
+      redis.maxmemory:
+        enabled: true
+      redis.cmd.latency:
+        enabled: true
+
+  filelog/redis:
+    include:
+      - /var/log/redis/*.log
+    operators:
+      - type: regex_parser
+        regex: '^(?P<pid>\d+):(?P<role>\w+) (?P<ts>\d{2} \w+ \d{4} \d{2}:\d{2}:\d{2}\.\d+) (?P<level>[.\-*#]) (?P<message>.*)'
+        timestamp:
+          parse_from: attributes.ts
+          layout: '02 Jan 2006 15:04:05.000'
+        severity:
+          parse_from: attributes.level
+          mapping:
+            debug: '.'
+            info: ['-', '*']
+            warn: '#'
+      - type: move
+        if: attributes.message != nil
+        from: attributes.message
+        to: body
+      - type: remove
+        if: attributes.ts != nil
+        field: attributes.ts
+      - type: remove
+        if: attributes.level != nil
+        field: attributes.level
+
+  hostmetrics:
+    root_path: /hostfs
+    collection_interval: 60s
+    scrapers:
+      cpu: {}
+      load: {}
+      memory: {}
+      disk: {}
+      filesystem: {}
+      network: {}
+      paging: {}
+
+processors:
+  batch:
+    send_batch_size: 1000
+    timeout: 10s
+
+  resourcedetection:
+    detectors: [env, system]
+    system:
+      hostname_sources: ['os']
+
+  resource:
+    attributes:
+      - key: service.name
+        value: redis
+        action: upsert
+
+exporters:
+  otlp:
+    endpoint: ${env:SIGNOZ_ENDPOINT}:4317
+    tls:
+      insecure: true
+
+service:
+  pipelines:
+    metrics:
+      receivers: [hostmetrics, redis]
+      processors: [resourcedetection, resource, batch]
+      exporters: [otlp]
+
+    logs:
+      receivers: [filelog/redis]
+      processors: [resourcedetection, resource, batch]
+      exporters: [otlp]

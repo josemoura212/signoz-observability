@@ -1,0 +1,88 @@
+receivers:
+  prometheus/clickhouse:
+    config:
+      scrape_configs:
+        - job_name: clickhouse
+          scrape_interval: 60s
+          static_configs:
+            - targets:
+                - ${env:CLICKHOUSE_ENDPOINT}
+
+  filelog/clickhouse:
+    include:
+      - /var/log/clickhouse-server/*.log
+    operators:
+      - type: recombine
+        combine_field: body
+        is_first_entry: body matches '^\d{4}\.\d{2}\.\d{2}'
+        max_log_size: 1048576
+      - type: regex_parser
+        regex: '^(?P<ts>\d{4}\.\d{2}\.\d{2} \d{2}:\d{2}:\d{2}\.\d+) \[ (?P<thread_id>\d+) \] \{(?P<query_id>[^}]*)\} <(?P<level>\w+)> (?P<component>\S+): (?P<message>.*)'
+        timestamp:
+          parse_from: attributes.ts
+          layout: '2006.01.02 15:04:05.999999'
+        severity:
+          parse_from: attributes.level
+          mapping:
+            trace: Trace
+            debug: Debug
+            info: Information
+            warn: Warning
+            error: Error
+            fatal: [Fatal, Critical]
+      - type: move
+        if: attributes.message != nil
+        from: attributes.message
+        to: body
+      - type: remove
+        if: attributes.ts != nil
+        field: attributes.ts
+      - type: remove
+        if: attributes.level != nil
+        field: attributes.level
+
+  hostmetrics:
+    root_path: /hostfs
+    collection_interval: 60s
+    scrapers:
+      cpu: {}
+      load: {}
+      memory: {}
+      disk: {}
+      filesystem: {}
+      network: {}
+      paging: {}
+
+processors:
+  batch:
+    send_batch_size: 1000
+    timeout: 10s
+
+  resourcedetection:
+    detectors: [env, system]
+    system:
+      hostname_sources: ['os']
+
+  resource:
+    attributes:
+      - key: service.name
+        value: clickhouse
+        action: upsert
+
+exporters:
+  otlp:
+    endpoint: ${env:SIGNOZ_ENDPOINT}:4317
+    tls:
+      insecure: true
+
+service:
+  pipelines:
+    metrics:
+      receivers: [hostmetrics, prometheus/clickhouse]
+      processors: [resourcedetection, resource, batch]
+      exporters: [otlp]
+
+    logs:
+      receivers: [filelog/clickhouse]
+      processors: [resourcedetection, resource, batch]
+      exporters: [otlp]

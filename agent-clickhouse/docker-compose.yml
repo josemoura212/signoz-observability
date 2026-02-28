@@ -1,0 +1,24 @@
+services:
+  otel-agent:
+    image: otel/opentelemetry-collector-contrib:${OTELCOL_CONTRIB_VERSION:-0.146.0}
+    container_name: otel-agent-clickhouse
+    restart: unless-stopped
+    command: ['--config=/etc/otel/config.yaml']
+    volumes:
+      - ./otel-agent-config.yaml:/etc/otel/config.yaml
+      - /:/hostfs:ro
+      - ${CLICKHOUSE_LOG_PATH:-/var/log/clickhouse-server}:/var/log/clickhouse-server:ro
+    environment:
+      HOST_PROC: /hostfs/proc
+      HOST_SYS: /hostfs/sys
+      HOST_ETC: /hostfs/etc
+      HOST_VAR: /hostfs/var
+      SIGNOZ_ENDPOINT: ${SIGNOZ_ENDPOINT}
+      CLICKHOUSE_ENDPOINT: ${CLICKHOUSE_ENDPOINT:-host.docker.internal:9363}
+    extra_hosts:
+      - 'host.docker.internal:host-gateway'
+    pid: host
+    logging:
+      options:
+        max-size: '20m'
+        max-file: '3'

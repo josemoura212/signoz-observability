@@ -1,0 +1,57 @@
+receivers:
+  otlp:
+    protocols:
+      grpc:
+        endpoint: 0.0.0.0:4317
+      http:
+        endpoint: 0.0.0.0:4318
+
+  hostmetrics:
+    root_path: /hostfs
+    collection_interval: 60s
+    scrapers:
+      cpu: {}
+      load: {}
+      memory: {}
+      disk: {}
+      filesystem: {}
+      network: {}
+      paging: {}
+      process:
+        mute_process_name_error: true
+        mute_process_exe_error: true
+        mute_process_io_error: true
+      processes: {}
+
+processors:
+  batch:
+    send_batch_size: 1000
+    timeout: 10s
+
+  resourcedetection:
+    detectors: [env, system]
+    system:
+      hostname_sources: ['os']
+
+exporters:
+  otlp:
+    endpoint: ${env:SIGNOZ_ENDPOINT}:4317
+    tls:
+      insecure: true
+
+service:
+  pipelines:
+    traces:
+      receivers: [otlp]
+      processors: [resourcedetection, batch]
+      exporters: [otlp]
+
+    metrics:
+      receivers: [otlp, hostmetrics]
+      processors: [resourcedetection, batch]
+      exporters: [otlp]
+
+    logs:
+      receivers: [otlp]
+      processors: [resourcedetection, batch]
+      exporters: [otlp]

@@ -1,0 +1,68 @@
+receivers:
+  otlp:
+    protocols:
+      grpc:
+        endpoint: 0.0.0.0:4317
+      http:
+        endpoint: 0.0.0.0:4318
+
+  kafkametrics:
+    brokers:
+      - ${env:KAFKA_BROKERS}
+    protocol_version: 2.0.0
+    scrapers:
+      - brokers
+      - topics
+      - consumers
+    collection_interval: 60s
+
+  hostmetrics:
+    root_path: /hostfs
+    collection_interval: 60s
+    scrapers:
+      cpu: {}
+      load: {}
+      memory: {}
+      disk: {}
+      filesystem: {}
+      network: {}
+      paging: {}
+
+processors:
+  batch:
+    send_batch_size: 1000
+    timeout: 10s
+
+  resourcedetection:
+    detectors: [env, system]
+    system:
+      hostname_sources: ['os']
+
+  resource:
+    attributes:
+      - key: service.name
+        value: kafka
+        action: upsert
+
+exporters:
+  otlp:
+    endpoint: ${env:SIGNOZ_ENDPOINT}:4317
+    tls:
+      insecure: true
+
+service:
+  pipelines:
+    traces:
+      receivers: [otlp]
+      processors: [resourcedetection, resource, batch]
+      exporters: [otlp]
+
+    metrics:
+      receivers: [otlp, hostmetrics, kafkametrics]
+      processors: [resourcedetection, resource, batch]
+      exporters: [otlp]
+
+    logs:
+      receivers: [otlp]
+      processors: [resourcedetection, resource, batch]
+      exporters: [otlp]

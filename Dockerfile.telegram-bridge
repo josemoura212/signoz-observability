@@ -1,0 +1,5 @@
+FROM python:3.12-alpine
+RUN pip install --no-cache-dir flask requests
+COPY telegram-bridge.py /app/bridge.py
+WORKDIR /app
+CMD ["python", "bridge.py"]

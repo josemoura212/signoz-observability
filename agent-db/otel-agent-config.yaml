@@ -1,0 +1,123 @@
+receivers:
+  otlp:
+    protocols:
+      grpc:
+        endpoint: 0.0.0.0:4317
+      http:
+        endpoint: 0.0.0.0:4318
+
+  hostmetrics:
+    root_path: /hostfs
+    collection_interval: 60s
+    scrapers:
+      cpu: {}
+      load: {}
+      memory: {}
+      disk: {}
+      filesystem: {}
+      network: {}
+      paging: {}
+
+  postgresql:
+    endpoint: ${env:PG_HOST}:${env:PG_PORT}
+    transport: tcp
+    username: ${env:PG_USER}
+    password: ${env:PG_PASSWORD}
+    databases:
+      - ${env:PG_DATABASE}
+    collection_interval: 60s
+    tls:
+      insecure: true
+    metrics:
+      postgresql.database.locks:
+        enabled: true
+      postgresql.deadlocks:
+        enabled: true
+      postgresql.sequential_scans:
+        enabled: true
+      postgresql.temp_files:
+        enabled: true
+      postgresql.blks_hit:
+        enabled: true
+      postgresql.blks_read:
+        enabled: true
+      postgresql.wal.delay:
+        enabled: true
+
+  filelog/pglog:
+    include:
+      - /var/log/postgresql/*.log
+    multiline:
+      line_start_pattern: '^\d{4}-\d{2}-\d{2}'
+    operators:
+      - type: regex_parser
+        regex: '^(?P<timestamp>\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}\.\d+ \w+) \[(?P<pid>\d+)\] (?P<user_db>\S+) (?P<level>\w+):\s+(?P<message>.*)'
+        timestamp:
+          parse_from: attributes.timestamp
+          layout: '%Y-%m-%d %H:%M:%S.%f %Z'
+        severity:
+          parse_from: attributes.level
+          mapping:
+            debug: [DEBUG, DEBUG1, DEBUG2, DEBUG3, DEBUG4, DEBUG5]
+            info: [LOG, INFO, NOTICE, DETAIL]
+            warn: WARNING
+            error: ERROR
+            fatal: [FATAL, PANIC]
+        on_error: send
+      - type: move
+        if: attributes.message != nil
+        from: attributes.message
+        to: body
+      - type: remove
+        if: attributes.timestamp != nil
+        field: attributes.timestamp
+      - type: remove
+        if: attributes.user_db != nil
+        field: attributes.user_db
+      - type: remove
+        if: attributes.level != nil
+        field: attributes.level
+    attributes:
+      source: postgresql
+
+processors:
+  batch:
+    send_batch_size: 1000
+    timeout: 10s
+
+  resourcedetection:
+    detectors: [env, system]
+    system:
+      hostname_sources: ['os']
+
+  resource:
+    attributes:
+      - key: service.name
+        value: ${env:PG_SERVICE_NAME}
+        action: upsert
+      - key: postgresql.role
+        value: ${env:PG_ROLE}
+        action: upsert
+
+exporters:
+  otlp:
+    endpoint: ${env:SIGNOZ_ENDPOINT}:4317
+    tls:
+      insecure: true
+
+service:
+  pipelines:
+    traces:
+      receivers: [otlp]
+      processors: [resourcedetection, resource, batch]
+      exporters: [otlp]
+
+    metrics:
+      receivers: [otlp, hostmetrics, postgresql]
+      processors: [resourcedetection, resource, batch]
+      exporters: [otlp]
+
+    logs:
+      receivers: [otlp, filelog/pglog]
+      processors: [resourcedetection, resource, batch]
+      exporters: [otlp]

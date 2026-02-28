@@ -1,0 +1,29 @@
+{
+  "name": "signoz-observability",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Stack de observabilidade com SigNoz + OTel agents",
+  "scripts": {
+    "signoz": "docker compose up -d",
+    "signoz:down": "docker compose down",
+    "signoz:logs": "docker compose logs -f",
+    "agent-app": "docker compose -f agent-app/docker-compose.yml up -d",
+    "agent-app:down": "docker compose -f agent-app/docker-compose.yml down",
+    "agent-app:logs": "docker compose -f agent-app/docker-compose.yml logs -f",
+    "agent-db": "docker compose -f agent-db/docker-compose.yml up -d",
+    "agent-db:down": "docker compose -f agent-db/docker-compose.yml down",
+    "agent-db:logs": "docker compose -f agent-db/docker-compose.yml logs -f",
+    "agent-mongo": "docker compose -f agent-mongo/docker-compose.yml up -d",
+    "agent-mongo:down": "docker compose -f agent-mongo/docker-compose.yml down",
+    "agent-mongo:logs": "docker compose -f agent-mongo/docker-compose.yml logs -f",
+    "agent-kafka": "docker compose -f agent-kafka/docker-compose.yml up -d",
+    "agent-kafka:down": "docker compose -f agent-kafka/docker-compose.yml down",
+    "agent-kafka:logs": "docker compose -f agent-kafka/docker-compose.yml logs -f",
+    "agent-redis": "docker compose -f agent-redis/docker-compose.yml up -d",
+    "agent-redis:down": "docker compose -f agent-redis/docker-compose.yml down",
+    "agent-redis:logs": "docker compose -f agent-redis/docker-compose.yml logs -f",
+    "agent-clickhouse": "docker compose -f agent-clickhouse/docker-compose.yml up -d",
+    "agent-clickhouse:down": "docker compose -f agent-clickhouse/docker-compose.yml down",
+    "agent-clickhouse:logs": "docker compose -f agent-clickhouse/docker-compose.yml logs -f"
+  }
+}
