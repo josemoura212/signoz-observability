@@ -188,6 +188,8 @@ services:
         condition: service_completed_successfully
     volumes:
       - otel_collector_config:/config
+      - /:/hostfs:ro
+    pid: host
     entrypoint: ['/bin/sh']
     command:
       - -c
@@ -201,6 +203,10 @@ services:
       SIGNOZ_OTEL_COLLECTOR_CLICKHOUSE_CLUSTER: cluster
       SIGNOZ_OTEL_COLLECTOR_CLICKHOUSE_REPLICATION: 'true'
       SIGNOZ_OTEL_COLLECTOR_TIMEOUT: 10m
+      HOST_PROC: /hostfs/proc
+      HOST_SYS: /hostfs/sys
+      HOST_ETC: /hostfs/etc
+      HOST_VAR: /hostfs/var
     ports:
       - '4317:4317'
       - '4318:4318'
