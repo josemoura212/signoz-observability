@@ -1,11 +1,10 @@
 services:
   otel-agent:
-    image: otel/opentelemetry-collector-contrib:${OTELCOL_CONTRIB_VERSION:-0.146.0}
+    image: otel/opentelemetry-collector-contrib:0.146.0
     container_name: otel-agent-clickhouse
     restart: unless-stopped
-    command: ['--config=/etc/otel/config.yaml']
+    command: ['--config=https://raw.githubusercontent.com/josemoura212/signoz-observability/main/agent-clickhouse/otel-agent-config.yaml']
     volumes:
-      - ./otel-agent-config.yaml:/etc/otel/config.yaml
       - /:/hostfs:ro
       - ${CLICKHOUSE_LOG_PATH:-/var/log/clickhouse-server}:/var/log/clickhouse-server:ro
     environment:
