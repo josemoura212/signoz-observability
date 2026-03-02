@@ -63,7 +63,7 @@ processors:
         action: upsert
 
 exporters:
-  otlp:
+  otlp_grpc:
     endpoint: ${env:SIGNOZ_ENDPOINT}:4317
     tls:
       insecure: true
@@ -73,9 +73,9 @@ service:
     metrics:
       receivers: [hostmetrics, redis]
       processors: [resourcedetection, resource, batch]
-      exporters: [otlp]
+      exporters: [otlp_grpc]
 
     logs:
       receivers: [filelog/redis]
       processors: [resourcedetection, resource, batch]
-      exporters: [otlp]
+      exporters: [otlp_grpc]
