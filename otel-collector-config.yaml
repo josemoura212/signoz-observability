@@ -119,8 +119,12 @@ service:
       processors: [signozspanmetrics/delta, batch]
       exporters: [clickhousetraces, metadataexporter, signozmeter]
     metrics:
-      receivers: [otlp, hostmetrics]
+      receivers: [otlp]
       processors: [batch]
+      exporters: [signozclickhousemetrics, metadataexporter, signozmeter]
+    metrics/hostmetrics:
+      receivers: [hostmetrics]
+      processors: [resourcedetection, batch]
       exporters: [signozclickhousemetrics, metadataexporter, signozmeter]
     metrics/prometheus:
       receivers: [prometheus]
