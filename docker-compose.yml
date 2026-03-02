@@ -154,6 +154,25 @@ services:
         max-size: '50m'
         max-file: '3'
 
+  init-otel-collector:
+    image: alpine:3.21
+    container_name: signoz-init-otel-collector
+    restart: on-failure
+    networks:
+      - signoz-net
+    volumes:
+      - otel_collector_config:/config
+    command:
+      - /bin/sh
+      - -c
+      - |
+        wget -q -O /config/otel-collector-config.yaml "https://raw.githubusercontent.com/josemoura212/signoz-observability/main/otel-collector-config.yaml" &&
+        echo 'server_endpoint: ws://signoz:4320/v1/opamp' > /config/manager-config.yaml
+    logging:
+      options:
+        max-size: '10m'
+        max-file: '3'
+
   otel-collector:
     image: signoz/signoz-otel-collector:${OTELCOL_TAG:-v0.144.2}
     container_name: signoz-otel-collector
@@ -165,13 +184,16 @@ services:
         condition: service_healthy
       signoz-telemetrystore-migrator:
         condition: service_completed_successfully
+      init-otel-collector:
+        condition: service_completed_successfully
+    volumes:
+      - otel_collector_config:/config
     entrypoint: ['/bin/sh']
     command:
       - -c
       - |
-        echo 'server_endpoint: ws://signoz:4320/v1/opamp' > /var/tmp/manager-config.yaml &&
         /signoz-otel-collector migrate sync check &&
-        /signoz-otel-collector --config=https://raw.githubusercontent.com/josemoura212/signoz-observability/main/otel-collector-config.yaml --manager-config=/var/tmp/manager-config.yaml
+        /signoz-otel-collector --config=/config/otel-collector-config.yaml --manager-config=/config/manager-config.yaml --copy-path=/var/tmp/collector-config-copy.yaml
     environment:
       OTEL_RESOURCE_ATTRIBUTES: host.name=signoz-host,os.type=linux
       LOW_CARDINAL_EXCEPTION_GROUPING: 'false'
@@ -202,3 +224,5 @@ volumes:
     name: signoz-clickhouse-user-scripts
   signoz_data:
     name: signoz-data
+  otel_collector_config:
+    name: signoz-otel-collector-config
