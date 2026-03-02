@@ -2,6 +2,7 @@ services:
   otel-agent:
     image: otel/opentelemetry-collector-contrib:0.146.0
     container_name: otel-agent-kafka
+    hostname: ${HOST_NAME}
     restart: unless-stopped
     command: ['--config=https://raw.githubusercontent.com/josemoura212/signoz-observability/main/agent-kafka/otel-agent-config.yaml']
     volumes:

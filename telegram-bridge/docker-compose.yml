@@ -1,0 +1,22 @@
+services:
+  telegram-bridge:
+    build:
+      context: ..
+      dockerfile: Dockerfile.telegram-bridge
+    container_name: signoz-telegram-bridge
+    restart: unless-stopped
+    networks:
+      - signoz-net
+    environment:
+      TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN}
+      TELEGRAM_CHAT_ID: ${TELEGRAM_CHAT_ID}
+    ports:
+      - '5001:5001'
+    logging:
+      options:
+        max-size: '10m'
+        max-file: '3'
+
+networks:
+  signoz-net:
+    external: true
