@@ -169,10 +169,9 @@ services:
     command:
       - -c
       - |
-        wget -q -O /var/tmp/otel-collector-config.yaml "https://raw.githubusercontent.com/josemoura212/signoz-observability/main/otel-collector-config.yaml" &&
         echo 'server_endpoint: ws://signoz:4320/v1/opamp' > /var/tmp/manager-config.yaml &&
         /signoz-otel-collector migrate sync check &&
-        /signoz-otel-collector --config=/var/tmp/otel-collector-config.yaml --manager-config=/var/tmp/manager-config.yaml --copy-path=/var/tmp/collector-config-copy.yaml
+        /signoz-otel-collector --config=https://raw.githubusercontent.com/josemoura212/signoz-observability/main/otel-collector-config.yaml --manager-config=/var/tmp/manager-config.yaml
     environment:
       OTEL_RESOURCE_ATTRIBUTES: host.name=signoz-host,os.type=linux
       LOW_CARDINAL_EXCEPTION_GROUPING: 'false'
