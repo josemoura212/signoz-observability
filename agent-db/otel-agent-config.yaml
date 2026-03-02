@@ -51,7 +51,7 @@ receivers:
       line_start_pattern: '^\d{4}-\d{2}-\d{2}'
     operators:
       - type: regex_parser
-        regex: '^(?P<timestamp>\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}\.\d+ \w+) \[\d+\] \S+ \S+ \S+ \S+ \S+ (?P<level>\w+):\s+(?P<message>.*)'
+        regex: '^(?P<timestamp>\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}\.\d+ \w+) \[\d+\] .*?(?P<level>LOG|ERROR|WARNING|FATAL|PANIC|DETAIL|HINT|CONTEXT|STATEMENT|INFO|NOTICE|DEBUG[1-5]?):\s+(?P<message>.*)'
         timestamp:
           parse_from: attributes.timestamp
           layout: '%Y-%m-%d %H:%M:%S.%f %Z'
