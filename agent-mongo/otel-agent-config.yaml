@@ -44,7 +44,7 @@ receivers:
       - /var/log/mongodb/*.log
     operators:
       - type: json_parser
-        if: body matches '^\s*{\s*".*}\s*$'
+        if: body matches '^\\s*{\\s*".*}\\s*$'
         parse_from: body
         parse_to: attributes
         timestamp:
