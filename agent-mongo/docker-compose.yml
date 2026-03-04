@@ -8,20 +8,16 @@ services:
     volumes:
       - /:/hostfs:ro
       - ${MONGO_LOG_PATH:-/var/log/mongodb}:/var/log/mongodb:ro
-    ports:
-      - '4317:4317'
-      - '4318:4318'
+    network_mode: host
     environment:
       HOST_PROC: /hostfs/proc
       HOST_SYS: /hostfs/sys
       HOST_ETC: /hostfs/etc
       HOST_VAR: /hostfs/var
       SIGNOZ_ENDPOINT: ${SIGNOZ_ENDPOINT}
-      MONGO_ENDPOINT: ${MONGO_ENDPOINT:-host.docker.internal:27017}
+      MONGO_ENDPOINT: ${MONGO_ENDPOINT:-localhost:27017}
       MONGO_USER: ${MONGO_MONITOR_USER}
       MONGO_PASSWORD: ${MONGO_MONITOR_PASSWORD}
-    extra_hosts:
-      - 'host.docker.internal:host-gateway'
     pid: host
     logging:
       options:
