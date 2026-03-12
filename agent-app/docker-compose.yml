@@ -1,9 +1,7 @@
 services:
   otel-agent:
     image: otel/opentelemetry-collector-contrib:0.146.0
-    container_name: otel-agent-server
-    hostname: ${HOST_NAME}
-    restart: unless-stopped
+    hostname: '{{.Node.Hostname}}'
     command: ['--config=https://raw.githubusercontent.com/josemoura212/signoz-observability/main/agent-app/otel-agent-config.yaml']
     volumes:
       - /:/hostfs:ro
@@ -17,6 +15,11 @@ services:
       HOST_VAR: /hostfs/var
       SIGNOZ_ENDPOINT: ${SIGNOZ_ENDPOINT}
     pid: host
+    deploy:
+      mode: global
+      restart_policy:
+        condition: any
+        delay: 5s
     logging:
       options:
         max-size: '20m'
