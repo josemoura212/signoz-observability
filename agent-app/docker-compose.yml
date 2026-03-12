@@ -3,11 +3,9 @@ services:
     image: otel/opentelemetry-collector-contrib:0.146.0
     hostname: '{{.Node.Hostname}}'
     command: ['--config=https://raw.githubusercontent.com/josemoura212/signoz-observability/main/agent-app/otel-agent-config.yaml']
+    network_mode: host
     volumes:
       - /:/hostfs:ro
-    ports:
-      - '4317:4317'
-      - '4318:4318'
     environment:
       HOST_PROC: /hostfs/proc
       HOST_SYS: /hostfs/sys
