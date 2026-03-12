@@ -24,6 +24,11 @@ receivers:
       processes: {}
 
 processors:
+  memory_limiter:
+    check_interval: 5s
+    limit_mib: 512
+    spike_limit_mib: 128
+
   batch:
     send_batch_size: 1000
     timeout: 10s
@@ -43,15 +48,15 @@ service:
   pipelines:
     traces:
       receivers: [otlp]
-      processors: [resourcedetection, batch]
+      processors: [memory_limiter, resourcedetection, batch]
       exporters: [otlp_grpc]
 
     metrics:
       receivers: [otlp, hostmetrics]
-      processors: [resourcedetection, batch]
+      processors: [memory_limiter, resourcedetection, batch]
       exporters: [otlp_grpc]
 
     logs:
       receivers: [otlp]
-      processors: [resourcedetection, batch]
+      processors: [memory_limiter, resourcedetection, batch]
       exporters: [otlp_grpc]

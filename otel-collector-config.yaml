@@ -42,6 +42,10 @@ receivers:
                 job_name: otel-collector
 
 processors:
+  memory_limiter:
+    check_interval: 5s
+    limit_mib: 10240
+    spike_limit_mib: 2048
   batch:
     send_batch_size: 10000
     send_batch_max_size: 11000
@@ -116,23 +120,23 @@ service:
   pipelines:
     traces:
       receivers: [otlp]
-      processors: [signozspanmetrics/delta, batch]
+      processors: [memory_limiter, signozspanmetrics/delta, batch]
       exporters: [clickhousetraces, metadataexporter, signozmeter]
     metrics:
       receivers: [otlp]
-      processors: [batch]
+      processors: [memory_limiter, batch]
       exporters: [signozclickhousemetrics, metadataexporter, signozmeter]
     metrics/hostmetrics:
       receivers: [hostmetrics]
-      processors: [resourcedetection, batch]
+      processors: [memory_limiter, resourcedetection, batch]
       exporters: [signozclickhousemetrics, metadataexporter, signozmeter]
     metrics/prometheus:
       receivers: [prometheus]
-      processors: [batch]
+      processors: [memory_limiter, batch]
       exporters: [signozclickhousemetrics, metadataexporter, signozmeter]
     logs:
       receivers: [otlp]
-      processors: [batch]
+      processors: [memory_limiter, batch]
       exporters: [clickhouselogsexporter, metadataexporter, signozmeter]
     metrics/meter:
       receivers: [signozmeter]

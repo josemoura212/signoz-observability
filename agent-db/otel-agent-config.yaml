@@ -78,6 +78,11 @@ receivers:
       source: postgresql
 
 processors:
+  memory_limiter:
+    check_interval: 5s
+    limit_mib: 512
+    spike_limit_mib: 128
+
   batch:
     send_batch_size: 1000
     timeout: 10s
@@ -106,15 +111,15 @@ service:
   pipelines:
     traces:
       receivers: [otlp]
-      processors: [resourcedetection, resource, batch]
+      processors: [memory_limiter, resourcedetection, resource, batch]
       exporters: [otlp_grpc]
 
     metrics:
       receivers: [otlp, hostmetrics, postgresql]
-      processors: [resourcedetection, resource, batch]
+      processors: [memory_limiter, resourcedetection, resource, batch]
       exporters: [otlp_grpc]
 
     logs:
       receivers: [otlp, filelog/pglog]
-      processors: [resourcedetection, resource, batch]
+      processors: [memory_limiter, resourcedetection, resource, batch]
       exporters: [otlp_grpc]
