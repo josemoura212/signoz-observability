@@ -210,6 +210,11 @@ services:
     ports:
       - '4317:4317'
       - '4318:4318'
+    deploy:
+      resources:
+        limits:
+          memory: 10G
+          cpus: '2'
     logging:
       options:
         max-size: '50m'

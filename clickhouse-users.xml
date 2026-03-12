@@ -3,6 +3,7 @@
     <profiles>
         <default>
             <max_memory_usage>10000000000</max_memory_usage>
+            <max_threads>4</max_threads>
             <load_balancing>random</load_balancing>
             <enable_json_type>1</enable_json_type>
         </default>
