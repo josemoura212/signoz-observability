@@ -1,11 +1,8 @@
 services:
   otel-agent:
     image: otel/opentelemetry-collector-contrib:0.146.0
-    container_name: otel-agent-app-kafka
     hostname: ${HOST_NAME}
-    restart: unless-stopped
     command: ['--config=https://raw.githubusercontent.com/josemoura212/signoz-observability/main/agent-app-kafka/otel-agent-config.yaml']
-    network_mode: host
     volumes:
       - /:/hostfs:ro
       - /etc/passwd:/etc/passwd:ro
@@ -17,7 +14,20 @@ services:
       SIGNOZ_ENDPOINT: ${SIGNOZ_ENDPOINT}
       KAFKA_BROKERS: ${KAFKA_BROKERS:-localhost:9092}
     pid: host
+    networks:
+      - hostnet
+    deploy:
+      mode: replicated
+      replicas: 1
+      restart_policy:
+        condition: any
+        delay: 5s
     logging:
       options:
         max-size: '20m'
         max-file: '3'
+
+networks:
+  hostnet:
+    external: true
+    name: host
