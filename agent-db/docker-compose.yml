@@ -7,6 +7,7 @@ services:
     command: ["--config=https://raw.githubusercontent.com/josemoura212/signoz-observability/main/agent-db/otel-agent-config.yaml"]
     volumes:
       - /:/hostfs:ro
+      - /etc/passwd:/etc/passwd:ro
       - ${PG_LOG_PATH:-/var/lib/postgresql/17/main/pg_log}:/var/log/postgresql:ro
     ports:
       - "4317:4317"

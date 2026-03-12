@@ -7,6 +7,7 @@ services:
     command: ['--config=https://raw.githubusercontent.com/josemoura212/signoz-observability/main/agent-redis/otel-agent-config.yaml']
     volumes:
       - /:/hostfs:ro
+      - /etc/passwd:/etc/passwd:ro
       - ${REDIS_LOG_PATH:-/var/log/redis}:/var/log/redis:ro
     environment:
       HOST_PROC: /hostfs/proc

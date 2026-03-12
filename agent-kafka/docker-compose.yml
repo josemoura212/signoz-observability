@@ -7,6 +7,7 @@ services:
     command: ['--config=https://raw.githubusercontent.com/josemoura212/signoz-observability/main/agent-kafka/otel-agent-config.yaml']
     volumes:
       - /:/hostfs:ro
+      - /etc/passwd:/etc/passwd:ro
     ports:
       - '4317:4317'
       - '4318:4318'

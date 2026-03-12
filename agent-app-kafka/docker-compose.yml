@@ -8,6 +8,7 @@ services:
     network_mode: host
     volumes:
       - /:/hostfs:ro
+      - /etc/passwd:/etc/passwd:ro
     environment:
       HOST_PROC: /hostfs/proc
       HOST_SYS: /hostfs/sys

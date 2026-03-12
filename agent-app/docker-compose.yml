@@ -5,6 +5,7 @@ services:
     command: ['--config=https://raw.githubusercontent.com/josemoura212/signoz-observability/main/agent-app/otel-agent-config.yaml']
     volumes:
       - /:/hostfs:ro
+      - /etc/passwd:/etc/passwd:ro
     environment:
       HOST_PROC: /hostfs/proc
       HOST_SYS: /hostfs/sys
