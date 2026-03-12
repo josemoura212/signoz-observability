@@ -18,7 +18,7 @@ services:
         mv histogram-quantile /var/lib/clickhouse/user_scripts/histogramQuantile
     restart: on-failure
     volumes:
-      - clickhouse_user_scripts:/var/lib/clickhouse/user_scripts/
+      - /mnt/signoz/clickhouse/user_scripts:/var/lib/clickhouse/user_scripts/
     logging:
       options:
         max-size: '50m'
@@ -36,7 +36,7 @@ services:
       signoz.io/port: '9141'
       signoz.io/path: '/metrics'
     volumes:
-      - zookeeper_data:/bitnami/zookeeper
+      - /mnt/signoz/zookeeper:/bitnami/zookeeper
     environment:
       ZOO_SERVER_ID: '1'
       ALLOW_ANONYMOUS_LOGIN: 'yes'
@@ -80,9 +80,9 @@ services:
         wget -q -O /etc/clickhouse-server/custom-function.xml "$$BASE/clickhouse-custom-function.xml"
         exec /entrypoint.sh
     volumes:
-      - clickhouse_data:/var/lib/clickhouse
-      - clickhouse_logs:/var/log/clickhouse-server
-      - clickhouse_user_scripts:/var/lib/clickhouse/user_scripts/
+      - /mnt/signoz/clickhouse/data:/var/lib/clickhouse
+      - /mnt/signoz/clickhouse/logs:/var/log/clickhouse-server
+      - /mnt/signoz/clickhouse/user_scripts:/var/lib/clickhouse/user_scripts/
     environment:
       CLICKHOUSE_SKIP_USER_SETUP: '1'
     ulimits:
@@ -112,7 +112,7 @@ services:
     ports:
       - '${SIGNOZ_PORT:-3301}:8080'
     volumes:
-      - signoz_data:/var/lib/signoz
+      - /mnt/signoz/signoz-data:/var/lib/signoz
     environment:
       SIGNOZ_ALERTMANAGER_PROVIDER: signoz
       SIGNOZ_TELEMETRYSTORE_CLICKHOUSE_DSN: tcp://clickhouse:9000
@@ -161,7 +161,7 @@ services:
     networks:
       - signoz-net
     volumes:
-      - otel_collector_config:/config
+      - /mnt/signoz/otel-collector-config:/config
     command:
       - /bin/sh
       - -c
@@ -187,7 +187,7 @@ services:
       init-otel-collector:
         condition: service_completed_successfully
     volumes:
-      - otel_collector_config:/config
+      - /mnt/signoz/otel-collector-config:/config
       - /:/hostfs:ro
     pid: host
     entrypoint: ['/bin/sh']
@@ -219,16 +219,3 @@ networks:
   signoz-net:
     name: signoz-net
 
-volumes:
-  zookeeper_data:
-    name: signoz-zookeeper
-  clickhouse_data:
-    name: signoz-clickhouse
-  clickhouse_logs:
-    name: signoz-clickhouse-logs
-  clickhouse_user_scripts:
-    name: signoz-clickhouse-user-scripts
-  signoz_data:
-    name: signoz-data
-  otel_collector_config:
-    name: signoz-otel-collector-config
