@@ -26,6 +26,10 @@
     <background_move_pool_size>1</background_move_pool_size>
     <background_fetches_pool_size>1</background_fetches_pool_size>
 
+    <merge_tree>
+        <number_of_free_entries_in_pool_to_execute_optimize_entire_partition>5</number_of_free_entries_in_pool_to_execute_optimize_entire_partition>
+    </merge_tree>
+
     <path>/var/lib/clickhouse/</path>
     <tmp_path>/var/lib/clickhouse/tmp/</tmp_path>
     <user_files_path>/var/lib/clickhouse/user_files/</user_files_path>
