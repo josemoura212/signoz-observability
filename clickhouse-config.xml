@@ -18,17 +18,17 @@
     <max_connections>4096</max_connections>
     <keep_alive_timeout>3</keep_alive_timeout>
     <max_concurrent_queries>50</max_concurrent_queries>
-    <background_pool_size>13</background_pool_size>
-    <background_merges_mutations_concurrency_ratio>2</background_merges_mutations_concurrency_ratio>
+    <background_pool_size>6</background_pool_size>
+    <background_merges_mutations_concurrency_ratio>1</background_merges_mutations_concurrency_ratio>
     <background_schedule_pool_size>2</background_schedule_pool_size>
     <background_common_pool_size>2</background_common_pool_size>
     <background_move_pool_size>1</background_move_pool_size>
     <background_fetches_pool_size>1</background_fetches_pool_size>
 
     <merge_tree>
-        <number_of_free_entries_in_pool_to_execute_optimize_entire_partition>10</number_of_free_entries_in_pool_to_execute_optimize_entire_partition>
-        <number_of_free_entries_in_pool_to_execute_mutation>10</number_of_free_entries_in_pool_to_execute_mutation>
-        <number_of_free_entries_in_pool_to_lower_max_size_of_merge>8</number_of_free_entries_in_pool_to_lower_max_size_of_merge>
+        <number_of_free_entries_in_pool_to_execute_optimize_entire_partition>4</number_of_free_entries_in_pool_to_execute_optimize_entire_partition>
+        <number_of_free_entries_in_pool_to_execute_mutation>4</number_of_free_entries_in_pool_to_execute_mutation>
+        <number_of_free_entries_in_pool_to_lower_max_size_of_merge>3</number_of_free_entries_in_pool_to_lower_max_size_of_merge>
     </merge_tree>
 
     <path>/var/lib/clickhouse/</path>

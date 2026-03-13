@@ -15,7 +15,7 @@ receivers:
         endpoint: 0.0.0.0:4318
   hostmetrics:
     root_path: /hostfs
-    collection_interval: 60s
+    collection_interval: 30s
     scrapers:
       cpu: {}
       load: {}
@@ -44,22 +44,22 @@ receivers:
 processors:
   memory_limiter:
     check_interval: 5s
-    limit_mib: 10240
-    spike_limit_mib: 2048
+    limit_mib: 3072
+    spike_limit_mib: 512
   batch:
-    send_batch_size: 10000
-    send_batch_max_size: 11000
-    timeout: 10s
+    send_batch_size: 2000
+    send_batch_max_size: 2500
+    timeout: 5s
   batch/meter:
-    send_batch_max_size: 25000
-    send_batch_size: 20000
-    timeout: 1s
+    send_batch_max_size: 5000
+    send_batch_size: 4000
+    timeout: 5s
   resourcedetection:
     detectors: [env, system]
     timeout: 2s
   signozspanmetrics/delta:
     metrics_exporter: signozclickhousemetrics
-    metrics_flush_interval: 60s
+    metrics_flush_interval: 30s
     latency_histogram_buckets:
       [100us, 1ms, 2ms, 6ms, 10ms, 50ms, 100ms, 250ms, 500ms, 1000ms, 1400ms, 2000ms, 5s, 10s, 20s, 40s, 60s]
     dimensions_cache_size: 100000
@@ -92,12 +92,33 @@ exporters:
     datasource: tcp://clickhouse:9000/signoz_traces
     low_cardinal_exception_grouping: ${env:LOW_CARDINAL_EXCEPTION_GROUPING}
     use_new_schema: true
+    timeout: 30s
+    retry_on_failure:
+      enabled: true
+      initial_interval: 5s
+      max_interval: 30s
+      max_elapsed_time: 300s
+    sending_queue:
+      enabled: true
+      num_consumers: 4
+      queue_size: 1000
   signozclickhousemetrics:
     dsn: tcp://clickhouse:9000/signoz_metrics
+    timeout: 30s
+    retry_on_failure:
+      enabled: true
+      initial_interval: 5s
+      max_interval: 30s
+      max_elapsed_time: 300s
   clickhouselogsexporter:
     dsn: tcp://clickhouse:9000/signoz_logs
-    timeout: 10s
+    timeout: 30s
     use_new_schema: true
+    retry_on_failure:
+      enabled: true
+      initial_interval: 5s
+      max_interval: 30s
+      max_elapsed_time: 300s
   signozclickhousemeter:
     dsn: tcp://clickhouse:9000/signoz_meter
     timeout: 45s
