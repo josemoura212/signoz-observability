@@ -6,6 +6,23 @@ receivers:
       http:
         endpoint: 0.0.0.0:4318
 
+  filelog/docker:
+    include:
+      - /hostfs/var/lib/docker/containers/*/*-json.log
+    include_file_path: true
+    start_at: end
+    operators:
+      - type: json_parser
+        id: docker_json
+      - type: move
+        from: attributes.log
+        to: body
+      - type: move
+        from: attributes.stream
+        to: attributes["log.iostream"]
+      - type: remove
+        field: attributes.time
+
   kafkametrics:
     brokers:
       - ${env:KAFKA_BROKERS}
@@ -67,6 +84,6 @@ service:
       exporters: [otlp_grpc]
 
     logs:
-      receivers: [otlp]
+      receivers: [otlp, filelog/docker]
       processors: [memory_limiter, resourcedetection, batch]
       exporters: [otlp_grpc]

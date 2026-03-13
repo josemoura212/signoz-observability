@@ -10,9 +10,22 @@ receivers:
 
   filelog/redis:
     include:
-      - /var/log/redis/*.log
+      - /host/containers/*/*-json.log
+    include_file_path: true
+    start_at: end
     operators:
+      - type: json_parser
+        id: docker_json
+      - type: move
+        from: attributes.log
+        to: body
+      - type: move
+        from: attributes.stream
+        to: attributes["log.iostream"]
+      - type: remove
+        field: attributes.time
       - type: regex_parser
+        if: 'body matches "^\\d+:\\w+ \\d{2} \\w+ \\d{4}"'
         regex: '^(?P<pid>\d+):(?P<role>\w+) (?P<ts>\d{2} \w+ \d{4} \d{2}:\d{2}:\d{2}\.\d+) (?P<level>[.\-*#]) (?P<message>.*)'
         timestamp:
           parse_from: attributes.ts

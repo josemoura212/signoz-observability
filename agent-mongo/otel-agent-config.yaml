@@ -41,8 +41,20 @@ receivers:
 
   filelog/mongolog:
     include:
-      - /var/log/mongodb/*.log
+      - /host/containers/*/*-json.log
+    include_file_path: true
+    start_at: end
     operators:
+      - type: json_parser
+        id: docker_json
+      - type: move
+        from: attributes.log
+        to: body
+      - type: move
+        from: attributes.stream
+        to: attributes["log.iostream"]
+      - type: remove
+        field: attributes.time
       - type: json_parser
         if: 'body matches "^\\s*\\{\\s*\".*\\}\\s*$"'
         parse_from: body

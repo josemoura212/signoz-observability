@@ -8,7 +8,7 @@ services:
     volumes:
       - /:/hostfs:ro
       - /etc/passwd:/etc/passwd:ro
-      - ${REDIS_LOG_PATH:-/var/log/redis}:/var/log/redis:ro
+      - /var/lib/docker/containers:/host/containers:ro
     environment:
       HOST_PROC: /hostfs/proc
       HOST_SYS: /hostfs/sys

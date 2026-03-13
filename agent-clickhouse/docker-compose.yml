@@ -8,7 +8,7 @@ services:
     volumes:
       - /:/hostfs:ro
       - /etc/passwd:/etc/passwd:ro
-      - ${CLICKHOUSE_LOG_PATH:-/var/log/clickhouse-server}:/var/log/clickhouse-server:ro
+      - ${CLICKHOUSE_LOG_PATH:-/mnt/signoz/clickhouse/logs}:/var/log/clickhouse-server:ro
     environment:
       HOST_PROC: /hostfs/proc
       HOST_SYS: /hostfs/sys

@@ -8,7 +8,7 @@ services:
     volumes:
       - /:/hostfs:ro
       - /etc/passwd:/etc/passwd:ro
-      - ${MONGO_LOG_PATH:-/var/log/mongodb}:/var/log/mongodb:ro
+      - /var/lib/docker/containers:/host/containers:ro
     network_mode: host
     environment:
       HOST_PROC: /hostfs/proc
