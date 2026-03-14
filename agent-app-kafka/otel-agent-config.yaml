@@ -10,6 +10,7 @@ receivers:
     include:
       - /hostfs/var/lib/docker/containers/*/*-json.log
     include_file_path: true
+    include_file_name: false
     start_at: end
     operators:
       - type: json_parser
@@ -22,6 +23,15 @@ receivers:
         to: attributes["log.iostream"]
       - type: remove
         field: attributes.time
+      - type: regex_parser
+        id: extract_container_id
+        parse_from: attributes["log.file.path"]
+        regex: '/containers/(?P<container_id>[a-f0-9]{12})'
+        on_error: send
+      - type: move
+        if: attributes.container_id != nil
+        from: attributes.container_id
+        to: resource["container.id"]
 
   kafkametrics:
     brokers:
