@@ -13,6 +13,7 @@ services:
       HOST_VAR: /hostfs/var
       SIGNOZ_ENDPOINT: ${SIGNOZ_ENDPOINT}
       KAFKA_BROKERS: ${KAFKA_BROKERS:-localhost:9092}
+    user: root
     pid: host
     networks:
       - hostnet

@@ -12,6 +12,7 @@ services:
       HOST_ETC: /hostfs/etc
       HOST_VAR: /hostfs/var
       SIGNOZ_ENDPOINT: ${SIGNOZ_ENDPOINT}
+    user: root
     pid: host
     networks:
       - hostnet
