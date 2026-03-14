@@ -8,7 +8,7 @@ receivers:
 
   hostmetrics:
     root_path: /hostfs
-    collection_interval: 60s
+    collection_interval: 30s
     scrapers:
       cpu: {}
       load: {}
@@ -23,7 +23,7 @@ receivers:
       - endpoint: ${env:MONGO_ENDPOINT}
     username: ${env:MONGO_USER}
     password: ${env:MONGO_PASSWORD}
-    collection_interval: 60s
+    collection_interval: 30s
     tls:
       insecure: true
       insecure_skip_verify: true
@@ -104,8 +104,8 @@ processors:
     spike_limit_mib: 128
 
   batch:
-    send_batch_size: 1000
-    timeout: 10s
+    send_batch_size: 1500
+    timeout: 5s
 
   resourcedetection:
     detectors: [env, system]

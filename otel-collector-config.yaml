@@ -15,7 +15,7 @@ receivers:
         endpoint: 0.0.0.0:4318
   hostmetrics:
     root_path: /hostfs
-    collection_interval: 30s
+    collection_interval: 15s
     scrapers:
       cpu: {}
       load: {}
@@ -32,7 +32,7 @@ receivers:
   prometheus:
     config:
       global:
-        scrape_interval: 60s
+        scrape_interval: 30s
       scrape_configs:
         - job_name: otel-collector
           static_configs:
@@ -44,25 +44,25 @@ receivers:
 processors:
   memory_limiter:
     check_interval: 5s
-    limit_mib: 3072
-    spike_limit_mib: 512
+    limit_mib: 4096
+    spike_limit_mib: 768
   batch:
-    send_batch_size: 2000
-    send_batch_max_size: 2500
-    timeout: 5s
+    send_batch_size: 3000
+    send_batch_max_size: 4000
+    timeout: 3s
   batch/meter:
-    send_batch_max_size: 5000
-    send_batch_size: 4000
-    timeout: 5s
+    send_batch_max_size: 6000
+    send_batch_size: 5000
+    timeout: 3s
   resourcedetection:
     detectors: [env, system]
     timeout: 2s
   signozspanmetrics/delta:
     metrics_exporter: signozclickhousemetrics
-    metrics_flush_interval: 30s
+    metrics_flush_interval: 15s
     latency_histogram_buckets:
-      [100us, 1ms, 2ms, 6ms, 10ms, 50ms, 100ms, 250ms, 500ms, 1000ms, 1400ms, 2000ms, 5s, 10s, 20s, 40s, 60s]
-    dimensions_cache_size: 100000
+      [100us, 500us, 1ms, 2ms, 4ms, 6ms, 10ms, 25ms, 50ms, 100ms, 200ms, 250ms, 500ms, 750ms, 1000ms, 1400ms, 2000ms, 5s, 10s, 20s, 40s, 60s]
+    dimensions_cache_size: 200000
     aggregation_temporality: AGGREGATION_TEMPORALITY_DELTA
     enable_exp_histogram: false
     dimensions:
@@ -100,7 +100,7 @@ exporters:
       max_elapsed_time: 300s
     sending_queue:
       enabled: true
-      num_consumers: 4
+      num_consumers: 8
       queue_size: 1000
   signozclickhousemetrics:
     dsn: tcp://clickhouse:9000/signoz_metrics

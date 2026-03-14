@@ -1,7 +1,7 @@
 receivers:
   redis:
     endpoint: ${env:REDIS_ENDPOINT}
-    collection_interval: 60s
+    collection_interval: 30s
     metrics:
       redis.maxmemory:
         enabled: true
@@ -49,7 +49,7 @@ receivers:
 
   hostmetrics:
     root_path: /hostfs
-    collection_interval: 60s
+    collection_interval: 30s
     scrapers:
       cpu: {}
       load: {}
@@ -66,8 +66,8 @@ processors:
     spike_limit_mib: 128
 
   batch:
-    send_batch_size: 1000
-    timeout: 10s
+    send_batch_size: 1500
+    timeout: 5s
 
   resourcedetection:
     detectors: [env, system]

@@ -2,13 +2,13 @@
 <clickhouse>
     <profiles>
         <default>
-            <max_memory_usage>6000000000</max_memory_usage>
-            <max_threads>2</max_threads>
-            <max_insert_threads>1</max_insert_threads>
+            <max_memory_usage>8000000000</max_memory_usage>
+            <max_threads>4</max_threads>
+            <max_insert_threads>2</max_insert_threads>
             <async_insert>1</async_insert>
             <wait_for_async_insert>0</wait_for_async_insert>
             <async_insert_max_data_size>20000000</async_insert_max_data_size>
-            <async_insert_busy_timeout_ms>10000</async_insert_busy_timeout_ms>
+            <async_insert_busy_timeout_ms>5000</async_insert_busy_timeout_ms>
             <load_balancing>random</load_balancing>
             <enable_json_type>1</enable_json_type>
         </default>

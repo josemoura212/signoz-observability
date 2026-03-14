@@ -98,8 +98,8 @@ services:
     deploy:
       resources:
         limits:
-          memory: 8G
-          cpus: '1.2'
+          memory: 11G
+          cpus: '2.0'
     healthcheck:
       test: ['CMD', 'wget', '--spider', '-q', '127.0.0.1:8123/ping']
       interval: 30s
@@ -126,8 +126,8 @@ services:
     deploy:
       resources:
         limits:
-          memory: 1G
-          cpus: '0.2'
+          memory: 1.5G
+          cpus: '0.3'
     environment:
       SIGNOZ_ALERTMANAGER_PROVIDER: signoz
       SIGNOZ_TELEMETRYSTORE_CLICKHOUSE_DSN: tcp://clickhouse:9000
@@ -228,8 +228,8 @@ services:
     deploy:
       resources:
         limits:
-          memory: 4G
-          cpus: '0.8'
+          memory: 5G
+          cpus: '1.5'
     logging:
       options:
         max-size: '50m'
