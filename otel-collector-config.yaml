@@ -57,6 +57,17 @@ processors:
   resourcedetection:
     detectors: [env, system]
     timeout: 2s
+  filter/logs:
+    error_mode: ignore
+    logs:
+      log_record:
+        - 'IsMatch(resource.attributes["service.name"], "signoz.*")'
+        - 'resource.attributes["service.name"] == "otel-collector"'
+        - 'IsMatch(body, ".*go\\.opentelemetry\\.io/collector.*")'
+        - 'IsMatch(body, ".*i\\.c\\.m\\.i\\.core.*")'
+        - 'IsMatch(body, ".*i\\.c\\.o\\.ObservabilityTaskBuilder.*")'
+        - 'IsMatch(body, ".*signoz-web\\..+\\.unnichat\\.com\\.br.*")'
+        - 'IsMatch(body, ".*captain-identifier-healthcheck.*")'
   signozspanmetrics/delta:
     metrics_exporter: signozclickhousemetrics
     metrics_flush_interval: 15s
@@ -157,7 +168,7 @@ service:
       exporters: [signozclickhousemetrics, metadataexporter, signozmeter]
     logs:
       receivers: [otlp]
-      processors: [memory_limiter, batch]
+      processors: [memory_limiter, filter/logs, batch]
       exporters: [clickhouselogsexporter, metadataexporter, signozmeter]
     metrics/meter:
       receivers: [signozmeter]

@@ -1,3 +1,11 @@
+# agent-app-kafka/otel-agent-config.yaml — v3
+#
+# CAMINHO B: Logs vêm via OTLP do SDK (Pino instrumentado).
+# filelog/docker REMOVIDO — evita duplicação.
+# Dozzle continua lendo do Docker API normalmente.
+#
+# O filter processor é safety net pro que escapar do SDK.
+
 receivers:
   otlp:
     protocols:
@@ -6,32 +14,7 @@ receivers:
       http:
         endpoint: 0.0.0.0:4318
 
-  filelog/docker:
-    include:
-      - /hostfs/var/lib/docker/containers/*/*-json.log
-    include_file_path: true
-    include_file_name: false
-    start_at: end
-    operators:
-      - type: json_parser
-        id: docker_json
-      - type: move
-        from: attributes.log
-        to: body
-      - type: move
-        from: attributes.stream
-        to: attributes["log.iostream"]
-      - type: remove
-        field: attributes.time
-      - type: regex_parser
-        id: extract_container_id
-        parse_from: attributes["log.file.path"]
-        regex: '/containers/(?P<container_id>[a-f0-9]{12})'
-        on_error: send
-      - type: move
-        if: attributes.container_id != nil
-        from: attributes.container_id
-        to: resource["container.id"]
+  # filelog/docker REMOVIDO — logs agora vêm pelo OTLP do SDK
 
   kafkametrics:
     brokers:
@@ -75,6 +58,23 @@ processors:
     system:
       hostname_sources: ['os']
 
+  # Safety net: dropa spans que escapem da filtragem do SDK
+  filter/traces:
+    error_mode: ignore
+    traces:
+      span:
+        # Socket.IO polling (principal causa dos 40GB/dia)
+        - 'IsMatch(attributes["http.target"], "/socket\\.io.*")'
+        # Health checks
+        - 'attributes["http.target"] == "/health"'
+        - 'attributes["http.target"] == "/healthz"'
+        - 'attributes["http.target"] == "/ready"'
+        - 'attributes["http.target"] == "/ping"'
+        # MongoDB driver internals
+        - 'attributes["db.system"] == "mongodb" and IsMatch(name, "mongodb\\.(hello|ismaster|isMaster|buildInfo|ping|endSessions|saslStart|saslContinue).*")'
+        # Redis internals
+        - 'attributes["db.system"] == "redis" and IsMatch(name, "redis-(ping|info|auth|select|client).*")'
+
 exporters:
   otlp_grpc:
     endpoint: ${env:SIGNOZ_ENDPOINT}:4317
@@ -85,7 +85,7 @@ service:
   pipelines:
     traces:
       receivers: [otlp]
-      processors: [memory_limiter, resourcedetection, batch]
+      processors: [memory_limiter, filter/traces, resourcedetection, batch]
       exporters: [otlp_grpc]
 
     metrics:
@@ -94,6 +94,6 @@ service:
       exporters: [otlp_grpc]
 
     logs:
-      receivers: [otlp, filelog/docker]
+      receivers: [otlp]
       processors: [memory_limiter, resourcedetection, batch]
       exporters: [otlp_grpc]
