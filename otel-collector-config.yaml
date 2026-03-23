@@ -28,6 +28,7 @@ receivers:
         mute_process_name_error: true
         mute_process_exe_error: true
         mute_process_io_error: true
+        mute_process_user_error: true
       processes: {}
   prometheus:
     config:
@@ -62,12 +63,18 @@ processors:
     logs:
       log_record:
         - 'IsMatch(resource.attributes["service.name"], "signoz.*")'
-        - 'resource.attributes["service.name"] == "otel-collector"'
-        - 'IsMatch(body, ".*go\\.opentelemetry\\.io/collector.*")'
-        - 'IsMatch(body, ".*i\\.c\\.m\\.i\\.core.*")'
+        - 'IsMatch(resource.attributes["service.name"], "otelcol.*")'
+        - 'IsMatch(body, ".*i\\.c\\.m\\.i\\.c\\..*")'
         - 'IsMatch(body, ".*i\\.c\\.o\\.ObservabilityTaskBuilder.*")'
-        - 'IsMatch(body, ".*signoz-web\\..+\\.unnichat\\.com\\.br.*")'
+        - 'IsMatch(body, ".*go\\.opentelemetry\\.io/collector.*")'
+        - 'IsMatch(body, ".*sync/waitgroup\\.go.*")'
+        - 'IsMatch(body, ".*scraperhelper.*obs_metrics.*")'
+        - 'IsMatch(body, ".*MultiTenantAlertmanager.*")'
+        - 'IsMatch(body, ".*/checkhealth.*")'
         - 'IsMatch(body, ".*captain-identifier-healthcheck.*")'
+        - 'IsMatch(body, ".*signoz-web\\..+\\.unnichat\\.com\\.br.*")'
+        - 'IsMatch(body, ".*datadog\\.explain_statement.*")'
+        - 'IsMatch(body, ".*permission denied for schema datadog.*")'
   signozspanmetrics/delta:
     metrics_exporter: signozclickhousemetrics
     metrics_flush_interval: 15s

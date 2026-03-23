@@ -43,6 +43,18 @@ processors:
     system:
       hostname_sources: ['os']
 
+  filter/traces:
+    error_mode: ignore
+    traces:
+      span:
+        - 'IsMatch(attributes["http.target"], "/socket\\.io.*")'
+        - 'attributes["http.target"] == "/health"'
+        - 'attributes["http.target"] == "/healthz"'
+        - 'attributes["http.target"] == "/ready"'
+        - 'attributes["http.target"] == "/ping"'
+        - 'attributes["db.system"] == "mongodb" and IsMatch(name, "mongodb\\.(hello|ismaster|isMaster|buildInfo|ping|endSessions|saslStart|saslContinue).*")'
+        - 'attributes["db.system"] == "redis" and IsMatch(name, "redis-(ping|info|auth|select|client).*")'
+
   resource:
     attributes:
       - key: service.name
@@ -59,7 +71,7 @@ service:
   pipelines:
     traces:
       receivers: [otlp]
-      processors: [memory_limiter, resourcedetection, resource, batch]
+      processors: [memory_limiter, filter/traces, resourcedetection, resource, batch]
       exporters: [otlp_grpc]
 
     metrics:
