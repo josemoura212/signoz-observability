@@ -71,15 +71,20 @@ service:
   pipelines:
     traces:
       receivers: [otlp]
-      processors: [memory_limiter, filter/traces, resourcedetection, resource, batch]
+      processors: [memory_limiter, filter/traces, resourcedetection, batch]
       exporters: [otlp_grpc]
 
-    metrics:
-      receivers: [otlp, hostmetrics, kafkametrics]
+    metrics/app:
+      receivers: [otlp]
+      processors: [memory_limiter, resourcedetection, batch]
+      exporters: [otlp_grpc]
+
+    metrics/infra:
+      receivers: [hostmetrics, kafkametrics]
       processors: [memory_limiter, resourcedetection, resource, batch]
       exporters: [otlp_grpc]
 
     logs:
       receivers: [otlp]
-      processors: [memory_limiter, resourcedetection, resource, batch]
+      processors: [memory_limiter, resourcedetection, batch]
       exporters: [otlp_grpc]
