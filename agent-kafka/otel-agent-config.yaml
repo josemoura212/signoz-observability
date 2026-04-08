@@ -79,8 +79,13 @@ service:
       processors: [memory_limiter, resourcedetection, batch]
       exporters: [otlp_grpc]
 
-    metrics/infra:
-      receivers: [hostmetrics, kafkametrics]
+    metrics/host:
+      receivers: [hostmetrics]
+      processors: [memory_limiter, resourcedetection, batch]
+      exporters: [otlp_grpc]
+
+    metrics/kafka:
+      receivers: [kafkametrics]
       processors: [memory_limiter, resourcedetection, resource, batch]
       exporters: [otlp_grpc]
 
