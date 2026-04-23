@@ -6,7 +6,7 @@ from flask import Flask, request
 app = Flask(__name__)
 
 BOT_TOKEN = os.environ["TELEGRAM_BOT_TOKEN"]
-CHAT_ID = os.environ["TELEGRAM_CHAT_ID"]
+CHAT_IDS = [cid.strip() for cid in os.environ["TELEGRAM_CHAT_IDS"].split(",") if cid.strip()]
 TELEGRAM_API = f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage"
 
 
@@ -37,10 +37,12 @@ def webhook():
         if extra:
             lines.append(f"\nLabels: `{json.dumps(extra)}`")
 
-        requests.post(
-            TELEGRAM_API,
-            json={"chat_id": CHAT_ID, "text": "\n".join(lines), "parse_mode": "Markdown"},
-        )
+        text = "\n".join(lines)
+        for chat_id in CHAT_IDS:
+            requests.post(
+                TELEGRAM_API,
+                json={"chat_id": chat_id, "text": text, "parse_mode": "Markdown"},
+            )
 
     return "ok", 200
 

@@ -9,7 +9,7 @@ services:
       - signoz-net
     environment:
       TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN}
-      TELEGRAM_CHAT_ID: ${TELEGRAM_CHAT_ID}
+      TELEGRAM_CHAT_IDS: ${TELEGRAM_CHAT_IDS}
     ports:
       - '5001:5001'
     logging:
