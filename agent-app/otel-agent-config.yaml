@@ -47,7 +47,7 @@ processors:
   resourcedetection:
     detectors: [env, system]
     system:
-      hostname_sources: ['os']
+      hostname_sources: ["os"]
 
   # Safety net: dropa spans que escapem da filtragem do SDK
   filter/traces:
@@ -72,10 +72,10 @@ exporters:
     tls:
       insecure: true
 
-  debug/logs:
-    verbosity: detailed
-    sampling_initial: 5
-    sampling_thereafter: 50
+  # debug/logs:
+  #   verbosity: detailed
+  #   sampling_initial: 5
+  #   sampling_thereafter: 50
 
 service:
   pipelines:
@@ -92,4 +92,4 @@ service:
     logs:
       receivers: [otlp]
       processors: [memory_limiter, resourcedetection, batch]
-      exporters: [otlp_grpc]
+      exporters: [otlp_grpc, debug/logs]
