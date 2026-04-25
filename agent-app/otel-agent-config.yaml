@@ -72,6 +72,11 @@ exporters:
     tls:
       insecure: true
 
+  debug/logs:
+    verbosity: detailed
+    sampling_initial: 5
+    sampling_thereafter: 50
+
 service:
   pipelines:
     traces:
