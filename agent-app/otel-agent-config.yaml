@@ -92,4 +92,4 @@ service:
     logs:
       receivers: [otlp]
       processors: [memory_limiter, resourcedetection, batch]
-      exporters: [otlp_grpc, debug/logs]
+      exporters: [otlp_grpc]
