@@ -66,6 +66,11 @@ def webhook():
         labels = alert.get("labels", {}) or {}
         annotations = alert.get("annotations", {}) or {}
 
+        # P3 (info) eh apenas observacao no SigNoz - nao notifica Telegram.
+        threshold_name = (labels.get("threshold.name") or labels.get("threshold_name") or "").lower()
+        if threshold_name == "info":
+            continue
+
         name = labels.get("alertname", "Unknown")
         summary = annotations.get("summary", "")
         description = annotations.get("description", "")
