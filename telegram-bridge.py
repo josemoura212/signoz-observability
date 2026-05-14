@@ -178,20 +178,45 @@ def send_slack(name: str, status: str, threshold_name: str,
 # ============================================================
 # Endpoints (1 por canal SigNoz)
 # ============================================================
+TIER_PRIORITY = {"critical": 3, "warning": 2, "info": 1}
+
+
 def _dispatch(alerts: list, status: str, sender) -> None:
+    """Deduplica alertas por (alertname, host.name) e envia apenas o tier
+    mais alto que disparou no mesmo webhook payload.
+
+    Exemplo: se um host cruza P2 e P1 simultaneamente, o SigNoz manda 2 alerts
+    no mesmo POST. O dispatch detecta e envia apenas o P1 critical.
+    """
+    # Agrupa por (alertname, host.name) e fica com o de maior tier_priority
+    by_group: dict[tuple[str, str], dict] = {}
     for alert in alerts:
         labels = alert.get("labels", {}) or {}
-        annotations = alert.get("annotations", {}) or {}
-
         threshold_name = get_threshold_name(labels)
         if threshold_name == "info":
-            continue  # P3 nao notifica em nenhum canal externo
+            continue  # P3 nunca notifica fora do SigNoz
 
+        name = labels.get("alertname", "Unknown")
+        host = labels.get("host.name", "")
+        key = (name, host)
+        prio = TIER_PRIORITY.get(threshold_name, 0)
+
+        current = by_group.get(key)
+        if not current or prio > current["_prio"]:
+            by_group[key] = {
+                "_prio": prio,
+                "alert": alert,
+                "threshold_name": threshold_name,
+            }
+
+    for entry in by_group.values():
+        alert = entry["alert"]
+        labels = alert.get("labels", {}) or {}
+        annotations = alert.get("annotations", {}) or {}
         name = labels.get("alertname", "Unknown")
         summary = annotations.get("summary", "")
         description = annotations.get("description", "")
-
-        sender(name, status, threshold_name, summary, description, labels)
+        sender(name, status, entry["threshold_name"], summary, description, labels)
 
 
 @app.route("/webhook", methods=["POST"])
