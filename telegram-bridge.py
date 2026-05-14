@@ -1,24 +1,27 @@
-"""Notification bridge SigNoz -> Telegram + Slack.
+"""Notification bridge SigNoz -> Telegram + Slack com dedup e agregacao.
 
 Dois endpoints separados, cada um corresponde a UM canal de notificacao
 configurado no SigNoz UI -> Settings -> Notification Channels (tipo "webhook"):
 
   POST /webhook/telegram   <- canal "Telegram" do SigNoz
-  POST /webhook/slack      <- canal "Slack" do SigNoz
+  POST /webhook/slack      <- canal "SlackWebhook" do SigNoz
 
-Cada rule no SigNoz escolhe quais canais quer disparar — o bridge so
-formata e roteia para o provider correto.
+Comportamento:
+1. P3 (info) e descartado em ambos endpoints — fica apenas no SigNoz UI.
+2. Multi-threshold dedup por host: se o mesmo host cruza P2 e P1
+   simultaneamente, envia apenas o tier mais alto (P1).
+3. Agregacao por (alertname, tier): consolida varios hosts no mesmo alerta
+   numa unica mensagem com lista. Reduz drasticamente o spam quando uma
+   metrica de infra dispara em multiplos hosts ao mesmo tempo.
 
-Convencao visual:
-  Tier         Telegram emoji   Slack color
-  P3 info      🟢                #2eb886 (verde)
-  P2 warning   🟡                #ecb22e (amarelo)
-  P1 critical  🔴                #e01e5a (vermelho)
-  resolved     ✅                #36a64f (verde claro)
-
-P3 (info) e descartado em ambos endpoints — fica apenas registrado no SigNoz UI.
+Tiers visuais:
+  P3 info      🟢 / #2eb886 (verde)       -> nao enviado
+  P2 warning   🟡 / #ecb22e (amarelo)
+  P1 critical  🔴 / #e01e5a (vermelho)
+  resolved     ✅ / #36a64f (verde claro)
 """
 import os
+import re
 
 import requests
 from flask import Flask, request
@@ -56,11 +59,15 @@ RESOLVED_COLOR = "#36a64f"
 RESOLVED_LABEL = "RESOLVED"
 UNKNOWN_EMOJI = "⚪"
 
-# Labels que viram ruido na mensagem final (chaves internas do SigNoz)
 INTERNAL_LABELS = {
     "alertname", "severity", "threshold.name", "threshold_name",
     "priority", "tier_name", "ruleId", "ruleSource",
 }
+
+TIER_PRIORITY = {"critical": 3, "warning": 2, "info": 1}
+
+# Regex para extrair valor numerico do description (ex: "Valor: 27.3%")
+VALUE_REGEX = re.compile(r"Valor:\s*([0-9.]+\s*\S*)", re.IGNORECASE)
 
 
 # ============================================================
@@ -77,7 +84,6 @@ def get_threshold_name(labels: dict) -> str:
 
 
 def tier_visuals(status: str, threshold_name: str) -> tuple[str, str, str]:
-    """Retorna (emoji, label, color) baseado em status + threshold tier."""
     if status == "resolved":
         return RESOLVED_EMOJI, RESOLVED_LABEL, RESOLVED_COLOR
     fmt = TIER_FORMAT.get(threshold_name)
@@ -86,32 +92,68 @@ def tier_visuals(status: str, threshold_name: str) -> tuple[str, str, str]:
     return UNKNOWN_EMOJI, "UNKNOWN", "#808080"
 
 
-def extract_extra_labels(labels: dict) -> dict:
-    return {k: v for k, v in labels.items() if k not in INTERNAL_LABELS}
+def extract_value(description: str) -> str:
+    """Extrai trecho 'X%' ou 'X ms' do description. Retorna '' se nao achar."""
+    if not description:
+        return ""
+    m = VALUE_REGEX.search(description)
+    return m.group(1).strip() if m else ""
+
+
+def extract_common_labels(items: list[dict]) -> dict:
+    """Retorna apenas labels presentes em TODOS items com o mesmo valor.
+    Ignora chaves internas e host.name (que varia por item)."""
+    if not items:
+        return {}
+    skip = INTERNAL_LABELS | {"host.name"}
+    first = {
+        k: v
+        for k, v in (items[0].get("labels") or {}).items()
+        if k not in skip
+    }
+    for it in items[1:]:
+        labels = it.get("labels") or {}
+        for k in list(first.keys()):
+            if labels.get(k) != first[k]:
+                first.pop(k)
+    return first
 
 
 # ============================================================
-# Telegram sender
+# Senders (recebem lista de items agregados)
 # ============================================================
-def send_telegram(name: str, status: str, threshold_name: str,
-                  summary: str, description: str, labels: dict) -> None:
+def send_telegram(alert_name: str, status: str, threshold_name: str,
+                  items: list[dict]) -> None:
     if not (TELEGRAM_BOT_TOKEN and TELEGRAM_CHAT_IDS):
         return
 
     emoji, tier_label, _ = tier_visuals(status, threshold_name)
+    header = f"{emoji} *{tier_label}* — {alert_name}"
 
-    header = f"{emoji} *{tier_label}* — {name}"
     lines = [header, f"Status: *{status}*"]
 
-    if summary:
-        lines.append(f"\n{summary}")
-    if description:
-        lines.append(f"\n{description}")
+    # Lista de hosts afetados
+    if len(items) == 1:
+        it = items[0]
+        host = (it.get("labels") or {}).get("host.name") or "?"
+        value = extract_value(it.get("description", ""))
+        suffix = f" — {value}" if value else ""
+        lines.append(f"\nHost: *{host}*{suffix}")
+        if it.get("description"):
+            lines.append(f"\n{it['description']}")
+    else:
+        lines.append(f"\n{len(items)} hosts afetados:")
+        for it in items:
+            host = (it.get("labels") or {}).get("host.name") or "?"
+            value = extract_value(it.get("description", ""))
+            suffix = f" — {value}" if value else ""
+            lines.append(f"  • {host}{suffix}")
 
-    extra = extract_extra_labels(labels)
-    if extra:
-        label_lines = "\n".join(f"  {k}: {v}" for k, v in sorted(extra.items()))
-        lines.append(f"\n{label_lines}")
+    common = extract_common_labels(items)
+    if common:
+        lines.append("")
+        for k, v in sorted(common.items()):
+            lines.append(f"  {k}: {v}")
 
     text = "\n".join(lines)
     for chat_id in TELEGRAM_CHAT_IDS:
@@ -125,28 +167,37 @@ def send_telegram(name: str, status: str, threshold_name: str,
             print(f"telegram error: {e}", flush=True)
 
 
-# ============================================================
-# Slack sender
-# ============================================================
-def send_slack(name: str, status: str, threshold_name: str,
-               summary: str, description: str, labels: dict) -> None:
+def send_slack(alert_name: str, status: str, threshold_name: str,
+               items: list[dict]) -> None:
     if not (SLACK_BOT_TOKEN and SLACK_CHANNEL):
         return
 
     emoji, tier_label, color = tier_visuals(status, threshold_name)
-    main_text = f"{emoji} *{tier_label}* — {name}"
+    main_text = f"{emoji} *{tier_label}* — {alert_name}"
 
     body_lines = [f"*Status:* {status}"]
-    if summary:
-        body_lines.append(summary)
-    if description:
-        body_lines.append(description)
 
-    extra = extract_extra_labels(labels)
-    if extra:
+    if len(items) == 1:
+        it = items[0]
+        host = (it.get("labels") or {}).get("host.name") or "?"
+        value = extract_value(it.get("description", ""))
+        suffix = f" — {value}" if value else ""
+        body_lines.append(f"*Host:* `{host}`{suffix}")
+        if it.get("description"):
+            body_lines.append(it["description"])
+    else:
+        body_lines.append(f"*{len(items)} hosts afetados:*")
+        for it in items:
+            host = (it.get("labels") or {}).get("host.name") or "?"
+            value = extract_value(it.get("description", ""))
+            suffix = f" — {value}" if value else ""
+            body_lines.append(f"• `{host}`{suffix}")
+
+    common = extract_common_labels(items)
+    if common:
         body_lines.append("")
         body_lines.append("*Labels:*")
-        for k, v in sorted(extra.items()):
+        for k, v in sorted(common.items()):
             body_lines.append(f"• `{k}`: {v}")
 
     payload = {
@@ -176,49 +227,49 @@ def send_slack(name: str, status: str, threshold_name: str,
 
 
 # ============================================================
-# Endpoints (1 por canal SigNoz)
+# Dispatch: dedup por host + agrega por (alertname, tier)
 # ============================================================
-TIER_PRIORITY = {"critical": 3, "warning": 2, "info": 1}
-
-
 def _dispatch(alerts: list, status: str, sender) -> None:
-    """Deduplica alertas por (alertname, host.name) e envia apenas o tier
-    mais alto que disparou no mesmo webhook payload.
-
-    Exemplo: se um host cruza P2 e P1 simultaneamente, o SigNoz manda 2 alerts
-    no mesmo POST. O dispatch detecta e envia apenas o P1 critical.
-    """
-    # Agrupa por (alertname, host.name) e fica com o de maior tier_priority
-    by_group: dict[tuple[str, str], dict] = {}
+    # Passo 1: dedup por (alertname, host) — mantem so o tier mais alto
+    by_host: dict[tuple[str, str], dict] = {}
     for alert in alerts:
         labels = alert.get("labels", {}) or {}
+        annotations = alert.get("annotations", {}) or {}
         threshold_name = get_threshold_name(labels)
         if threshold_name == "info":
-            continue  # P3 nunca notifica fora do SigNoz
+            continue  # P3 nunca notifica fora do SigNoz UI
 
-        name = labels.get("alertname", "Unknown")
+        alertname = labels.get("alertname", "Unknown")
         host = labels.get("host.name", "")
-        key = (name, host)
+        key = (alertname, host)
         prio = TIER_PRIORITY.get(threshold_name, 0)
 
-        current = by_group.get(key)
+        current = by_host.get(key)
         if not current or prio > current["_prio"]:
-            by_group[key] = {
+            by_host[key] = {
                 "_prio": prio,
-                "alert": alert,
                 "threshold_name": threshold_name,
+                "labels": labels,
+                "description": annotations.get("description", ""),
+                "summary": annotations.get("summary", ""),
             }
 
-    for entry in by_group.values():
-        alert = entry["alert"]
-        labels = alert.get("labels", {}) or {}
-        annotations = alert.get("annotations", {}) or {}
-        name = labels.get("alertname", "Unknown")
-        summary = annotations.get("summary", "")
-        description = annotations.get("description", "")
-        sender(name, status, entry["threshold_name"], summary, description, labels)
+    # Passo 2: agrupa por (alertname, tier) com a lista de hosts afetados
+    by_group: dict[tuple[str, str], list[dict]] = {}
+    for (alertname, _host), entry in by_host.items():
+        group_key = (alertname, entry["threshold_name"])
+        by_group.setdefault(group_key, []).append(entry)
+
+    # Passo 3: envia uma mensagem por grupo
+    for (alertname, threshold_name), items in by_group.items():
+        # ordena por host pra mensagem ficar consistente
+        items.sort(key=lambda x: (x.get("labels") or {}).get("host.name", ""))
+        sender(alertname, status, threshold_name, items)
 
 
+# ============================================================
+# Endpoints (1 por canal SigNoz)
+# ============================================================
 @app.route("/webhook", methods=["POST"])
 @app.route("/webhook/telegram", methods=["POST"])
 def webhook_telegram():
@@ -245,32 +296,30 @@ def health():
 
 @app.route("/test/<channel>", methods=["POST"])
 def test_channel(channel: str):
-    """Envia um alerta sintetico de teste no canal escolhido.
+    """Envia um alerta sintetico com 3 hosts agrupados (P1 critical).
 
     Uso:
         curl -X POST http://bridge:5001/test/telegram
         curl -X POST http://bridge:5001/test/slack
     """
-    fake_labels = {
-        "alertname": "TEST - Bridge",
-        "severity": "critical",
-        "threshold.name": "critical",
-        "category": "infrastructure",
-        "metric": "cpu",
-        "host.name": "unnichat-docker-01",
-    }
+    fake_items = [
+        {
+            "labels": {"alertname": "TEST - Bridge", "category": "infrastructure",
+                       "metric": "cpu", "host.name": h, "threshold.name": "critical"},
+            "description": f"CPU em {h} no nivel critical. Valor: {v}",
+            "summary": "",
+        }
+        for h, v in [
+            ("unnichat-docker-01", "96.4%"),
+            ("unnichat-docker-03", "98.1%"),
+            ("unnichat-db-01", "94.7%"),
+        ]
+    ]
     sender = {"telegram": send_telegram, "slack": send_slack}.get(channel)
     if not sender:
         return {"error": f"unknown channel: {channel}"}, 400
-    sender(
-        "TEST - Bridge",
-        "firing",
-        "critical",
-        "Teste do bridge",
-        f"Mensagem de teste enviada via /test/{channel}",
-        fake_labels,
-    )
-    return {"sent": channel}, 200
+    sender("TEST - Bridge", "firing", "critical", fake_items)
+    return {"sent": channel, "items": len(fake_items)}, 200
 
 
 if __name__ == "__main__":
