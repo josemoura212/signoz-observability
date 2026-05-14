@@ -66,6 +66,14 @@ def webhook():
         labels = alert.get("labels", {}) or {}
         annotations = alert.get("annotations", {}) or {}
 
+        # P3 (info) fica apenas no SigNoz, nao notifica Telegram.
+        # Tambem aplica para alertas resolved que ainda carregam threshold.name=info,
+        # para nao mostrar o tier P3 sumindo se ele nunca chegou a notificar.
+        threshold_name = (labels.get("threshold.name") or labels.get("threshold_name") or "").lower()
+        severity = (labels.get("severity") or "").lower()
+        if threshold_name == "info" or (not threshold_name and severity == "info"):
+            continue
+
         name = labels.get("alertname", "Unknown")
         summary = annotations.get("summary", "")
         description = annotations.get("description", "")
