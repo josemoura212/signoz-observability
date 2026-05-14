@@ -3,4 +3,6 @@ node_modules/
 dashboards/
 CLAUDE.md
 .claude/
-alerts/
+alerts/_legacy/
+alerts/__pycache__/
+__pycache__/
