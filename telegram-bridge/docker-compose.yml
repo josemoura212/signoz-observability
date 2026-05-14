@@ -10,6 +10,8 @@ services:
     environment:
       TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN}
       TELEGRAM_CHAT_IDS: ${TELEGRAM_CHAT_IDS}
+      SLACK_BOT_TOKEN: ${SLACK_BOT_TOKEN}
+      SLACK_CHANNEL: ${SLACK_CHANNEL}
     ports:
       - '5001:5001'
     logging:

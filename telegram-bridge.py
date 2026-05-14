@@ -1,16 +1,23 @@
-"""Webhook bridge SigNoz -> Telegram com diferenciacao por prioridade.
+"""Notification bridge SigNoz -> Telegram + Slack.
 
-Mapeia o threshold_name (info/warning/critical) que vem do SigNoz para
-3 tiers visuais distintos:
+Dois endpoints separados, cada um corresponde a UM canal de notificacao
+configurado no SigNoz UI -> Settings -> Notification Channels (tipo "webhook"):
 
-  🟢 P3 OBSERVE   info       -> tendencia, sem urgencia, baixa frequencia
-  🟡 P2 WARN      warning    -> investigar quando der
-  🔴 P1 CRITICAL  critical   -> acao imediata
+  POST /webhook/telegram   <- canal "Telegram" do SigNoz
+  POST /webhook/slack      <- canal "Slack" do SigNoz
 
-O webhook tambem recebe alertas de resolucao (status=resolved) - eles
-chegam com checkmark independente do tier.
+Cada rule no SigNoz escolhe quais canais quer disparar — o bridge so
+formata e roteia para o provider correto.
+
+Convencao visual:
+  Tier         Telegram emoji   Slack color
+  P3 info      🟢                #2eb886 (verde)
+  P2 warning   🟡                #ecb22e (amarelo)
+  P1 critical  🔴                #e01e5a (vermelho)
+  resolved     ✅                #36a64f (verde claro)
+
+P3 (info) e descartado em ambos endpoints — fica apenas registrado no SigNoz UI.
 """
-import json
 import os
 
 import requests
@@ -18,104 +25,227 @@ from flask import Flask, request
 
 app = Flask(__name__)
 
-BOT_TOKEN = os.environ["TELEGRAM_BOT_TOKEN"]
-CHAT_IDS = [cid.strip() for cid in os.environ["TELEGRAM_CHAT_IDS"].split(",") if cid.strip()]
-TELEGRAM_API = f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage"
+# ============================================================
+# Telegram
+# ============================================================
+TELEGRAM_BOT_TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN", "")
+TELEGRAM_CHAT_IDS = [
+    cid.strip()
+    for cid in os.environ.get("TELEGRAM_CHAT_IDS", "").split(",")
+    if cid.strip()
+]
+TELEGRAM_API = f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/sendMessage"
 
+# ============================================================
+# Slack
+# ============================================================
+SLACK_BOT_TOKEN = os.environ.get("SLACK_BOT_TOKEN", "")
+SLACK_CHANNEL = os.environ.get("SLACK_CHANNEL", "")
+SLACK_API = "https://slack.com/api/chat.postMessage"
 
+# ============================================================
+# Visual
+# ============================================================
 TIER_FORMAT = {
-    "critical": {"emoji": "🔴", "label": "P1 CRITICAL"},
-    "warning":  {"emoji": "🟡", "label": "P2 WARN"},
-    "info":     {"emoji": "🟢", "label": "P3 OBSERVE"},
+    "critical": {"emoji": "🔴", "label": "P1 CRITICAL", "color": "#e01e5a"},
+    "warning":  {"emoji": "🟡", "label": "P2 WARN",     "color": "#ecb22e"},
+    "info":     {"emoji": "🟢", "label": "P3 OBSERVE",  "color": "#2eb886"},
 }
 RESOLVED_EMOJI = "✅"
+RESOLVED_COLOR = "#36a64f"
+RESOLVED_LABEL = "RESOLVED"
 UNKNOWN_EMOJI = "⚪"
 
-
-def resolve_tier(labels: dict) -> tuple[str, str]:
-    """Identifica o tier do alerta retornando (emoji, label).
-
-    SigNoz envia o threshold tier em `threshold.name` (com dot, nao underscore).
-    Severity da rule e sempre o tier mais alto (geralmente critical), por isso
-    threshold.name e mais confiavel para diferenciar P3/P2/P1 individualmente.
-    """
-    # SigNoz envia chaves com dot literal (threshold.name, host.name, etc).
-    threshold_name = (labels.get("threshold.name") or labels.get("threshold_name") or "").lower()
-    severity = (labels.get("severity") or "").lower()
-
-    # Preferencia: threshold.name (tier do alerta que disparou) > severity (highest da rule)
-    if threshold_name in TIER_FORMAT:
-        return _format_for(threshold_name)
-    if severity in TIER_FORMAT:
-        return _format_for(severity)
-    return UNKNOWN_EMOJI, "UNKNOWN"
+# Labels que viram ruido na mensagem final (chaves internas do SigNoz)
+INTERNAL_LABELS = {
+    "alertname", "severity", "threshold.name", "threshold_name",
+    "priority", "tier_name", "ruleId", "ruleSource",
+}
 
 
-def _format_for(severity: str) -> tuple[str, str]:
-    fmt = TIER_FORMAT[severity]
-    return fmt["emoji"], fmt["label"]
+# ============================================================
+# Helpers
+# ============================================================
+def get_threshold_name(labels: dict) -> str:
+    """Le threshold.name (chave com dot literal) com fallback para severity."""
+    return (
+        labels.get("threshold.name")
+        or labels.get("threshold_name")
+        or labels.get("severity")
+        or ""
+    ).lower()
 
 
-@app.route("/webhook", methods=["POST"])
-def webhook():
-    data = request.json or {}
-    status = data.get("status", "unknown")
-    alerts = data.get("alerts", [])
+def tier_visuals(status: str, threshold_name: str) -> tuple[str, str, str]:
+    """Retorna (emoji, label, color) baseado em status + threshold tier."""
+    if status == "resolved":
+        return RESOLVED_EMOJI, RESOLVED_LABEL, RESOLVED_COLOR
+    fmt = TIER_FORMAT.get(threshold_name)
+    if fmt:
+        return fmt["emoji"], fmt["label"], fmt["color"]
+    return UNKNOWN_EMOJI, "UNKNOWN", "#808080"
 
-    for alert in alerts:
-        labels = alert.get("labels", {}) or {}
-        annotations = alert.get("annotations", {}) or {}
 
-        # P3 (info) fica apenas no SigNoz, nao notifica Telegram.
-        # Tambem aplica para alertas resolved que ainda carregam threshold.name=info,
-        # para nao mostrar o tier P3 sumindo se ele nunca chegou a notificar.
-        threshold_name = (labels.get("threshold.name") or labels.get("threshold_name") or "").lower()
-        severity = (labels.get("severity") or "").lower()
-        if threshold_name == "info" or (not threshold_name and severity == "info"):
-            continue
+def extract_extra_labels(labels: dict) -> dict:
+    return {k: v for k, v in labels.items() if k not in INTERNAL_LABELS}
 
-        name = labels.get("alertname", "Unknown")
-        summary = annotations.get("summary", "")
-        description = annotations.get("description", "")
 
-        if status == "resolved":
-            emoji, tier_label = RESOLVED_EMOJI, "RESOLVED"
-        else:
-            emoji, tier_label = resolve_tier(labels)
+# ============================================================
+# Telegram sender
+# ============================================================
+def send_telegram(name: str, status: str, threshold_name: str,
+                  summary: str, description: str, labels: dict) -> None:
+    if not (TELEGRAM_BOT_TOKEN and TELEGRAM_CHAT_IDS):
+        return
 
-        header = f"{emoji} *{tier_label}* — {name}"
-        lines = [header, f"Status: *{status}*"]
+    emoji, tier_label, _ = tier_visuals(status, threshold_name)
 
-        if summary:
-            lines.append(f"\n{summary}")
-        if description:
-            lines.append(f"\n{description}")
+    header = f"{emoji} *{tier_label}* — {name}"
+    lines = [header, f"Status: *{status}*"]
 
-        # Labels relevantes: deixa o que ajuda no diagnostico, esconde ruido interno.
-        skip = {
-            "alertname", "severity", "threshold.name", "threshold_name",
-            "priority", "tier_name", "ruleId", "ruleSource",
-        }
-        extra = {k: v for k, v in labels.items() if k not in skip}
-        if extra:
-            # Formata como key: value uma por linha (mais legivel que JSON denso)
-            label_lines = "\n".join(f"  {k}: {v}" for k, v in sorted(extra.items()))
-            lines.append(f"\n{label_lines}")
+    if summary:
+        lines.append(f"\n{summary}")
+    if description:
+        lines.append(f"\n{description}")
 
-        text = "\n".join(lines)
-        for chat_id in CHAT_IDS:
+    extra = extract_extra_labels(labels)
+    if extra:
+        label_lines = "\n".join(f"  {k}: {v}" for k, v in sorted(extra.items()))
+        lines.append(f"\n{label_lines}")
+
+    text = "\n".join(lines)
+    for chat_id in TELEGRAM_CHAT_IDS:
+        try:
             requests.post(
                 TELEGRAM_API,
                 json={"chat_id": chat_id, "text": text, "parse_mode": "Markdown"},
                 timeout=10,
             )
+        except Exception as e:
+            print(f"telegram error: {e}", flush=True)
 
+
+# ============================================================
+# Slack sender
+# ============================================================
+def send_slack(name: str, status: str, threshold_name: str,
+               summary: str, description: str, labels: dict) -> None:
+    if not (SLACK_BOT_TOKEN and SLACK_CHANNEL):
+        return
+
+    emoji, tier_label, color = tier_visuals(status, threshold_name)
+    main_text = f"{emoji} *{tier_label}* — {name}"
+
+    body_lines = [f"*Status:* {status}"]
+    if summary:
+        body_lines.append(summary)
+    if description:
+        body_lines.append(description)
+
+    extra = extract_extra_labels(labels)
+    if extra:
+        body_lines.append("")
+        body_lines.append("*Labels:*")
+        for k, v in sorted(extra.items()):
+            body_lines.append(f"• `{k}`: {v}")
+
+    payload = {
+        "channel": SLACK_CHANNEL,
+        "text": main_text,
+        "attachments": [{
+            "color": color,
+            "text": "\n".join(body_lines),
+            "mrkdwn_in": ["text"],
+        }],
+    }
+    try:
+        r = requests.post(
+            SLACK_API,
+            headers={
+                "Authorization": f"Bearer {SLACK_BOT_TOKEN}",
+                "Content-Type": "application/json; charset=utf-8",
+            },
+            json=payload,
+            timeout=10,
+        )
+        body = r.json() if r.headers.get("content-type", "").startswith("application/json") else {}
+        if not body.get("ok"):
+            print(f"slack error: status={r.status_code} body={r.text}", flush=True)
+    except Exception as e:
+        print(f"slack exception: {e}", flush=True)
+
+
+# ============================================================
+# Endpoints (1 por canal SigNoz)
+# ============================================================
+def _dispatch(alerts: list, status: str, sender) -> None:
+    for alert in alerts:
+        labels = alert.get("labels", {}) or {}
+        annotations = alert.get("annotations", {}) or {}
+
+        threshold_name = get_threshold_name(labels)
+        if threshold_name == "info":
+            continue  # P3 nao notifica em nenhum canal externo
+
+        name = labels.get("alertname", "Unknown")
+        summary = annotations.get("summary", "")
+        description = annotations.get("description", "")
+
+        sender(name, status, threshold_name, summary, description, labels)
+
+
+@app.route("/webhook", methods=["POST"])
+@app.route("/webhook/telegram", methods=["POST"])
+def webhook_telegram():
+    data = request.json or {}
+    _dispatch(data.get("alerts", []), data.get("status", "unknown"), send_telegram)
+    return "ok", 200
+
+
+@app.route("/webhook/slack", methods=["POST"])
+def webhook_slack():
+    data = request.json or {}
+    _dispatch(data.get("alerts", []), data.get("status", "unknown"), send_slack)
     return "ok", 200
 
 
 @app.route("/health", methods=["GET"])
 def health():
-    return "ok", 200
+    return {
+        "status": "ok",
+        "telegram_enabled": bool(TELEGRAM_BOT_TOKEN and TELEGRAM_CHAT_IDS),
+        "slack_enabled": bool(SLACK_BOT_TOKEN and SLACK_CHANNEL),
+    }, 200
+
+
+@app.route("/test/<channel>", methods=["POST"])
+def test_channel(channel: str):
+    """Envia um alerta sintetico de teste no canal escolhido.
+
+    Uso:
+        curl -X POST http://bridge:5001/test/telegram
+        curl -X POST http://bridge:5001/test/slack
+    """
+    fake_labels = {
+        "alertname": "TEST - Bridge",
+        "severity": "critical",
+        "threshold.name": "critical",
+        "category": "infrastructure",
+        "metric": "cpu",
+        "host.name": "unnichat-docker-01",
+    }
+    sender = {"telegram": send_telegram, "slack": send_slack}.get(channel)
+    if not sender:
+        return {"error": f"unknown channel: {channel}"}, 400
+    sender(
+        "TEST - Bridge",
+        "firing",
+        "critical",
+        "Teste do bridge",
+        f"Mensagem de teste enviada via /test/{channel}",
+        fake_labels,
+    )
+    return {"sent": channel}, 200
 
 
 if __name__ == "__main__":
