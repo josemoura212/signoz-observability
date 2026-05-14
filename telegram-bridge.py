@@ -22,11 +22,17 @@ Tiers visuais:
 """
 import os
 import re
+import threading
+from collections import defaultdict
 
 import requests
 from flask import Flask, request
 
 app = Flask(__name__)
+
+# Janela de batching: SigNoz envia 1 POST por alerta. Acumulamos por N segundos
+# para conseguir agrupar hosts numa unica mensagem.
+BATCH_WINDOW_SEC = int(os.environ.get("BRIDGE_BATCH_WINDOW_SEC", "5"))
 
 # ============================================================
 # Telegram
@@ -268,20 +274,62 @@ def _dispatch(alerts: list, status: str, sender) -> None:
 
 
 # ============================================================
+# Batch buffer (SigNoz envia 1 POST por alert; agrupamos por N segundos)
+# ============================================================
+# _buffer: {(channel, status): [alerts]}
+_buffer: dict[tuple[str, str], list] = defaultdict(list)
+_buffer_lock = threading.Lock()
+_flush_timer: threading.Timer | None = None
+
+
+def _flush_buffer() -> None:
+    """Executado pelo Timer apos BATCH_WINDOW_SEC. Esvazia o buffer e despacha."""
+    global _flush_timer
+    with _buffer_lock:
+        snapshot = {k: v[:] for k, v in _buffer.items()}
+        _buffer.clear()
+        _flush_timer = None
+
+    senders = {"telegram": send_telegram, "slack": send_slack}
+    for (channel, status), alerts in snapshot.items():
+        sender = senders.get(channel)
+        if not sender or not alerts:
+            continue
+        try:
+            _dispatch(alerts, status, sender)
+        except Exception as e:
+            print(f"flush error ({channel}): {e}", flush=True)
+
+
+def _enqueue(channel: str, alerts: list, status: str) -> None:
+    """Adiciona alerts ao buffer e agenda flush. Idempotente: nao re-agenda
+    se ja existe um timer ativo."""
+    global _flush_timer
+    if not alerts:
+        return
+    with _buffer_lock:
+        _buffer[(channel, status)].extend(alerts)
+        if _flush_timer is None:
+            _flush_timer = threading.Timer(BATCH_WINDOW_SEC, _flush_buffer)
+            _flush_timer.daemon = True
+            _flush_timer.start()
+
+
+# ============================================================
 # Endpoints (1 por canal SigNoz)
 # ============================================================
 @app.route("/webhook", methods=["POST"])
 @app.route("/webhook/telegram", methods=["POST"])
 def webhook_telegram():
     data = request.json or {}
-    _dispatch(data.get("alerts", []), data.get("status", "unknown"), send_telegram)
+    _enqueue("telegram", data.get("alerts", []), data.get("status", "unknown"))
     return "ok", 200
 
 
 @app.route("/webhook/slack", methods=["POST"])
 def webhook_slack():
     data = request.json or {}
-    _dispatch(data.get("alerts", []), data.get("status", "unknown"), send_slack)
+    _enqueue("slack", data.get("alerts", []), data.get("status", "unknown"))
     return "ok", 200
 
 
