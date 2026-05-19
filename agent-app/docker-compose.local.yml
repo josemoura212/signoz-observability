@@ -1,0 +1,15 @@
+services:
+  otel-agent:
+    hostname: ${HOSTNAME:-local-test}
+    network_mode: host
+    networks: !reset []
+    restart: always
+    deploy: !reset null
+    command: ['--config=/etc/otelcol/config.yaml']
+    volumes:
+      - /:/hostfs:ro
+      - /etc/passwd:/etc/passwd:ro
+      - ./otel-agent-config.yaml:/etc/otelcol/config.yaml:ro
+
+networks:
+  hostnet: !reset null
