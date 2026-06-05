@@ -18,11 +18,31 @@ KAFKA_BROKERS=localhost:9092
 
 Se o Kafka roda em Docker no mesmo host, usar `localhost:9092` ou o mapeamento de porta correspondente.
 
-## 2. Subir o agent
+## 2. Subir o agent (Docker Swarm)
+
+Stack = `otel-agent` (`mode: global`, 1 por node: hostmetrics + kafkametrics + OTLP relay)
++ 3 `jmx-scraper-brokerN` (`replicas: 1`, 1 por broker: JMX broker+JVM).
 
 ```bash
-docker compose up -d
+docker stack deploy -c docker-compose.yml agent-kafka
 ```
+
+(ou Portainer: Stacks > Add stack > colar o `docker-compose.yml`)
+
+### JMX (throughput REAL + saude broker/JVM)
+
+Os 3 `jmx-scraper-brokerN` raspam o JMX :9999 de cada broker (10.0.0.83 / .221 / .166) e
+exportam OTLP pro SigNoz. Imagem publica + baixam o jar no start (sem build/registry).
+Pre-requisito: JMX 9999 acessivel. **Validar de fora ANTES com jmxterm** (nao so `nc`):
+
+```bash
+java -jar jmxterm-1.0.4-uber.jar -n -l service:jmx:rmi:///jndi/rmi://10.0.0.83:9999/jmxrmi
+# > beans -d kafka.controller   (deve listar; se travar, falta rmi.port/hostname no broker)
+```
+
+Metricas novas: `kafka.message.count` (throughput real), `kafka.network.io`,
+`kafka.partition.under_replicated`, `kafka.controller.active.count`, `kafka.isr.operation.count`,
+`jvm.memory.heap.*`, `jvm.gc.*`. Ver `dashboards/kafka-overview.json`.
 
 ## 3. Verificar no SigNoz
 
