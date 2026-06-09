@@ -58,6 +58,20 @@ processors:
   resourcedetection:
     detectors: [env, system]
     timeout: 2s
+  # Safety net global: mesmo filtro dos agents — protege telemetria que chega DIRETO
+  # no principal (consumers exportam sem passar por agent). Antes do signozspanmetrics
+  # pra nao poluir as metricas APM.
+  filter/traces:
+    error_mode: ignore
+    traces:
+      span:
+        - 'IsMatch(attributes["http.target"], "/socket\\.io.*")'
+        - 'attributes["http.target"] == "/health"'
+        - 'attributes["http.target"] == "/healthz"'
+        - 'attributes["http.target"] == "/ready"'
+        - 'attributes["http.target"] == "/ping"'
+        - 'attributes["db.system"] == "mongodb" and IsMatch(name, "mongodb\\.(hello|ismaster|isMaster|buildInfo|ping|endSessions|saslStart|saslContinue).*")'
+        - 'attributes["db.system"] == "redis" and IsMatch(name, "redis-(ping|info|auth|select|client).*")'
   filter/logs:
     error_mode: ignore
     logs:
@@ -160,7 +174,7 @@ service:
   pipelines:
     traces:
       receivers: [otlp]
-      processors: [memory_limiter, signozspanmetrics/delta, batch]
+      processors: [memory_limiter, filter/traces, signozspanmetrics/delta, batch]
       exporters: [clickhousetraces, metadataexporter, signozmeter]
     metrics:
       receivers: [otlp]

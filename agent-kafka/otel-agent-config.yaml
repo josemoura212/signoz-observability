@@ -1,11 +1,10 @@
-receivers:
-  otlp:
-    protocols:
-      grpc:
-        endpoint: 0.0.0.0:4317
-      http:
-        endpoint: 0.0.0.0:4318
+# agent-kafka/otel-agent-config.yaml
+#
+# Papel: SO metricas de infra (hostmetrics + kafkametrics).
+# Telemetria dos consumers (traces/logs/metrics OTLP) vai DIRETO pro collector
+# principal (http://10.0.0.173:4317) — receiver otlp e pipelines de app REMOVIDOS.
 
+receivers:
   kafkametrics:
     brokers:
       - ${env:KAFKA_BROKERS}
@@ -46,18 +45,6 @@ processors:
     system:
       hostname_sources: ['os']
 
-  filter/traces:
-    error_mode: ignore
-    traces:
-      span:
-        - 'IsMatch(attributes["http.target"], "/socket\\.io.*")'
-        - 'attributes["http.target"] == "/health"'
-        - 'attributes["http.target"] == "/healthz"'
-        - 'attributes["http.target"] == "/ready"'
-        - 'attributes["http.target"] == "/ping"'
-        - 'attributes["db.system"] == "mongodb" and IsMatch(name, "mongodb\\.(hello|ismaster|isMaster|buildInfo|ping|endSessions|saslStart|saslContinue).*")'
-        - 'attributes["db.system"] == "redis" and IsMatch(name, "redis-(ping|info|auth|select|client).*")'
-
   resource:
     attributes:
       - key: service.name
@@ -72,16 +59,6 @@ exporters:
 
 service:
   pipelines:
-    traces:
-      receivers: [otlp]
-      processors: [memory_limiter, filter/traces, resourcedetection, batch]
-      exporters: [otlp_grpc]
-
-    metrics/app:
-      receivers: [otlp]
-      processors: [memory_limiter, resourcedetection, batch]
-      exporters: [otlp_grpc]
-
     metrics/host:
       receivers: [hostmetrics]
       processors: [memory_limiter, resourcedetection, batch]
@@ -90,9 +67,4 @@ service:
     metrics/kafka:
       receivers: [kafkametrics]
       processors: [memory_limiter, resourcedetection, resource, batch]
-      exporters: [otlp_grpc]
-
-    logs:
-      receivers: [otlp]
-      processors: [memory_limiter, resourcedetection, batch]
       exporters: [otlp_grpc]
