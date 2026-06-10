@@ -15,7 +15,7 @@ receivers:
         endpoint: 0.0.0.0:4318
   hostmetrics:
     root_path: /hostfs
-    collection_interval: 15s
+    collection_interval: 30s
     scrapers:
       cpu: {}
       load: {}
@@ -24,12 +24,6 @@ receivers:
       filesystem: {}
       network: {}
       paging: {}
-      process:
-        mute_process_name_error: true
-        mute_process_exe_error: true
-        mute_process_io_error: true
-        mute_process_user_error: true
-      processes: {}
   prometheus:
     config:
       global:
@@ -90,12 +84,17 @@ processors:
         - 'IsMatch(body, ".*signoz-web\\..+\\.unnichat\\.com\\.br.*")'
         - 'IsMatch(body, ".*datadog\\.explain_statement.*")'
         - 'IsMatch(body, ".*permission denied for schema datadog.*")'
+  # Head sampling 25% — fica DEPOIS do signozspanmetrics no pipeline, entao as
+  # metricas APM (RPS, latencia, error rate) continuam 100% precisas; so o
+  # armazenamento de traces brutos no ClickHouse e amostrado.
+  probabilistic_sampler:
+    sampling_percentage: 25
   signozspanmetrics/delta:
     metrics_exporter: signozclickhousemetrics
     metrics_flush_interval: 15s
     latency_histogram_buckets:
       [100us, 500us, 1ms, 2ms, 4ms, 6ms, 10ms, 25ms, 50ms, 100ms, 200ms, 250ms, 500ms, 750ms, 1000ms, 1400ms, 2000ms, 5s, 10s, 20s, 40s, 60s]
-    dimensions_cache_size: 200000
+    dimensions_cache_size: 50000
     aggregation_temporality: AGGREGATION_TEMPORALITY_DELTA
     enable_exp_histogram: false
     dimensions:
@@ -105,11 +104,6 @@ processors:
         default: default
       - name: signoz.collector.id
       - name: service.version
-      - name: browser.platform
-      - name: browser.mobile
-      - name: k8s.cluster.name
-      - name: k8s.node.name
-      - name: k8s.namespace.name
       - name: host.name
       - name: host.type
       - name: container.name
@@ -174,7 +168,7 @@ service:
   pipelines:
     traces:
       receivers: [otlp]
-      processors: [memory_limiter, filter/traces, signozspanmetrics/delta, batch]
+      processors: [memory_limiter, filter/traces, signozspanmetrics/delta, probabilistic_sampler, batch]
       exporters: [clickhousetraces, metadataexporter, signozmeter]
     metrics:
       receivers: [otlp]
