@@ -32,3 +32,19 @@ services:
       options:
         max-size: "20m"
         max-file: "3"
+
+  # Traduz o console admin do PgBouncer em metricas Prometheus (:9127).
+  # network_mode: host -> alcanca o pgbouncer em 127.0.0.1 e publica :9127 no host,
+  # que o otel-agent-db scrapeia via host.docker.internal:9127.
+  pgbouncer-exporter:
+    image: prometheuscommunity/pgbouncer-exporter:latest
+    container_name: pgbouncer-exporter
+    restart: unless-stopped
+    network_mode: host
+    command:
+      - "--pgBouncer.connectionString=postgres://${PGBOUNCER_STATS_USER:-datadog}:${PGBOUNCER_STATS_PASSWORD}@127.0.0.1:${PGBOUNCER_PORT:-16543}/pgbouncer?sslmode=disable"
+      - "--web.listen-address=:9127"
+    logging:
+      options:
+        max-size: "10m"
+        max-file: "3"

@@ -47,6 +47,14 @@ receivers:
       postgresql.wal.delay:
         enabled: true
 
+  prometheus/pgbouncer:
+    config:
+      scrape_configs:
+        - job_name: pgbouncer
+          scrape_interval: 30s
+          static_configs:
+            - targets: ['host.docker.internal:9127']
+
   filelog/pglog:
     include:
       - /var/log/postgresql/*.log
@@ -118,7 +126,7 @@ service:
       exporters: [otlp_grpc]
 
     metrics:
-      receivers: [otlp, hostmetrics, postgresql]
+      receivers: [otlp, hostmetrics, postgresql, prometheus/pgbouncer]
       processors: [memory_limiter, resourcedetection, resource, batch]
       exporters: [otlp_grpc]
 
