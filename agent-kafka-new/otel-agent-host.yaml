@@ -13,12 +13,6 @@ receivers:
       filesystem: {}
       network: {}
       paging: {}
-      process:
-        mute_process_name_error: true
-        mute_process_exe_error: true
-        mute_process_io_error: true
-        mute_process_user_error: true
-      processes: {}
 
   docker_stats:
     endpoint: unix:///var/run/docker.sock
@@ -46,6 +40,7 @@ receivers:
     start_at: end
     operators:
       - type: json_parser
+        if: 'body matches "^\\s*\\{"'
         timestamp:
           parse_from: attributes.time
           layout_type: gotime
