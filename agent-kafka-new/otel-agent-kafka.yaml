@@ -1,0 +1,44 @@
+receivers:
+  kafkametrics:
+    brokers:
+      - ${env:KAFKA_BROKERS}
+    protocol_version: 2.0.0
+    scrapers:
+      - brokers
+      - topics
+      - consumers
+    collection_interval: 30s
+
+processors:
+  memory_limiter:
+    check_interval: 5s
+    limit_mib: 256
+    spike_limit_mib: 64
+
+  resourcedetection:
+    detectors: [env, system]
+    system:
+      hostname_sources: ['os']
+
+  resource:
+    attributes:
+      - key: service.name
+        value: kafka
+        action: upsert
+
+  batch:
+    send_batch_size: 1500
+    timeout: 5s
+
+exporters:
+  otlp_grpc:
+    endpoint: ${env:SIGNOZ_ENDPOINT}:4317
+    tls:
+      insecure: true
+
+service:
+  pipelines:
+    metrics/kafka:
+      receivers: [kafkametrics]
+      processors: [memory_limiter, resourcedetection, resource, batch]
+      exporters: [otlp_grpc]

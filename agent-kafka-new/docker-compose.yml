@@ -1,0 +1,58 @@
+services:
+  otel-agent-kafka:
+    image: otel/opentelemetry-collector-contrib:0.146.0
+    hostname: "{{.Node.Hostname}}"
+    command:
+      - "--config=https://raw.githubusercontent.com/josemoura212/signoz-observability/main/agent-kafka-new/otel-agent-kafka.yaml"
+    environment:
+      SIGNOZ_ENDPOINT: ${SIGNOZ_ENDPOINT}
+      KAFKA_BROKERS: ${KAFKA_BROKERS:-localhost:9092}
+    networks:
+      - hostnet
+    deploy:
+      mode: replicated
+      replicas: 1
+      placement:
+        constraints:
+          - node.labels.signoz_role == kafka
+      restart_policy:
+        condition: any
+        delay: 5s
+    logging:
+      options:
+        max-size: "20m"
+        max-file: "3"
+
+  otel-agent-host:
+    image: otel/opentelemetry-collector-contrib:0.146.0
+    hostname: "{{.Node.Hostname}}"
+    user: "0:0"
+    command:
+      - "--config=https://raw.githubusercontent.com/josemoura212/signoz-observability/main/agent-kafka-new/otel-agent-host.yaml"
+    volumes:
+      - /:/hostfs:ro
+      - /etc/passwd:/etc/passwd:ro
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    environment:
+      HOST_PROC: /hostfs/proc
+      HOST_SYS: /hostfs/sys
+      HOST_ETC: /hostfs/etc
+      HOST_VAR: /hostfs/var
+      SIGNOZ_ENDPOINT: ${SIGNOZ_ENDPOINT}
+    networks:
+      - hostnet
+    pid: host
+    deploy:
+      mode: global
+      restart_policy:
+        condition: any
+        delay: 5s
+    logging:
+      options:
+        max-size: "20m"
+        max-file: "3"
+
+networks:
+  hostnet:
+    external: true
+    name: host

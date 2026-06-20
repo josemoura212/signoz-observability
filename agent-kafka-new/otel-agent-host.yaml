@@ -1,0 +1,117 @@
+receivers:
+  hostmetrics:
+    root_path: /hostfs
+    collection_interval: 30s
+    scrapers:
+      cpu:
+        metrics:
+          system.cpu.utilization:
+            enabled: true
+      load: {}
+      memory: {}
+      disk: {}
+      filesystem: {}
+      network: {}
+      paging: {}
+      process:
+        mute_process_name_error: true
+        mute_process_exe_error: true
+        mute_process_io_error: true
+        mute_process_user_error: true
+      processes: {}
+
+  docker_stats:
+    endpoint: unix:///var/run/docker.sock
+    collection_interval: 30s
+    excluded_images:
+      - "*opentelemetry-collector*"
+    container_labels_to_metric_labels:
+      com.docker.swarm.service.name: swarm.service.name
+    metrics:
+      container.cpu.utilization:
+        enabled: true
+      container.memory.usage.total:
+        enabled: true
+      container.memory.percent:
+        enabled: true
+      container.network.io.usage.tx_bytes:
+        enabled: true
+      container.network.io.usage.rx_bytes:
+        enabled: true
+
+  filelog:
+    include:
+      - /hostfs/var/lib/docker/containers/*/*-json.log
+    include_file_path: true
+    start_at: end
+    operators:
+      - type: json_parser
+        timestamp:
+          parse_from: attributes.time
+          layout_type: gotime
+          layout: '2006-01-02T15:04:05.999999999Z07:00'
+      - type: add
+        field: resource["service.name"]
+        value: 'EXPR(attributes.attrs["com.docker.swarm.service.name"])'
+        if: 'attributes.attrs != nil and attributes.attrs["com.docker.swarm.service.name"] != nil'
+      - type: filter
+        expr: 'resource["service.name"] == nil or resource["service.name"] not matches "consumer"'
+      - type: move
+        from: attributes.log
+        to: body
+      - type: json_parser
+        parse_from: body
+        parse_to: attributes
+        if: 'body matches "^\\s*\\{"'
+      - type: severity_parser
+        parse_from: attributes.level
+        mapping:
+          trace: 10
+          debug: 20
+          info: 30
+          warn: 40
+          error: 50
+          fatal: 60
+        if: 'attributes.level != nil'
+      - type: move
+        from: attributes.msg
+        to: body
+        if: 'attributes.msg != nil'
+
+processors:
+  memory_limiter:
+    check_interval: 5s
+    limit_mib: 512
+    spike_limit_mib: 128
+
+  resourcedetection:
+    detectors: [env, system]
+    system:
+      hostname_sources: ['os']
+
+  batch:
+    send_batch_size: 1500
+    timeout: 5s
+
+exporters:
+  otlp_grpc:
+    endpoint: ${env:SIGNOZ_ENDPOINT}:4317
+    tls:
+      insecure: true
+
+service:
+  pipelines:
+    metrics/host:
+      receivers: [hostmetrics]
+      processors: [memory_limiter, resourcedetection, batch]
+      exporters: [otlp_grpc]
+
+    metrics/containers:
+      receivers: [docker_stats]
+      processors: [memory_limiter, resourcedetection, batch]
+      exporters: [otlp_grpc]
+
+    logs:
+      receivers: [filelog]
+      processors: [memory_limiter, resourcedetection, batch]
+      exporters: [otlp_grpc]
