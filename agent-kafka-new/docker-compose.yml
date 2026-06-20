@@ -6,7 +6,6 @@ services:
       - "--config=https://raw.githubusercontent.com/josemoura212/signoz-observability/main/agent-kafka-new/otel-agent-kafka.yaml"
     environment:
       SIGNOZ_ENDPOINT: ${SIGNOZ_ENDPOINT}
-      KAFKA_BROKERS: ${KAFKA_BROKERS:-localhost:9092}
     networks:
       - hostnet
     deploy:
