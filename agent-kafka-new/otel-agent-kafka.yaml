@@ -27,6 +27,9 @@ processors:
       - key: service.name
         value: kafka
         action: upsert
+      - key: host.name
+        value: unni-kafka
+        action: upsert
 
   batch:
     send_batch_size: 1500
