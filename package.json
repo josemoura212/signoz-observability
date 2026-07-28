@@ -24,6 +24,9 @@
     "agent-redis:logs": "docker compose -f agent-redis/docker-compose.yml logs -f",
     "agent-clickhouse": "docker compose -f agent-clickhouse/docker-compose.yml up -d",
     "agent-clickhouse:down": "docker compose -f agent-clickhouse/docker-compose.yml down",
-    "agent-clickhouse:logs": "docker compose -f agent-clickhouse/docker-compose.yml logs -f"
+    "agent-clickhouse:logs": "docker compose -f agent-clickhouse/docker-compose.yml logs -f",
+    "agent-mongot": "docker compose -f agent-mongot/docker-compose.yml up -d",
+    "agent-mongot:down": "docker compose -f agent-mongot/docker-compose.yml down",
+    "agent-mongot:logs": "docker compose -f agent-mongot/docker-compose.yml logs -f"
   }
 }

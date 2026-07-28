@@ -1,0 +1,97 @@
+receivers:
+  hostmetrics:
+    root_path: /hostfs
+    collection_interval: 30s
+    scrapers:
+      cpu:
+        metrics:
+          system.cpu.utilization:
+            enabled: true
+      load: {}
+      memory: {}
+      disk: {}
+      filesystem: {}
+      network: {}
+      paging: {}
+
+  prometheus/mongot:
+    config:
+      scrape_configs:
+        - job_name: mongot
+          scrape_interval: 30s
+          static_configs:
+            - targets:
+                - ${env:MONGOT_ENDPOINT}
+          metric_relabel_configs:
+            - source_labels: [__name__]
+              regex: 'mongot_(jvm_memory_(used|committed|max)_bytes|jvm_gc_pause_seconds(_count|_sum|_max)?|jvm_gc_memory_allocated_bytes_total|jvm_gc_live_data_size_bytes|process_(cpu_usage|uptime_seconds)|system_(cpu_usage|cpu_count|load_average_1m)|system_memory_phys_(total|inUse|available)_bytes|system_disk_space_(data_path_)?(total|free)_bytes|system_process_openFileDescriptors_objects|readiness_lifecycleInitialized|cursorManager_trackedCursors|mongoClient_connectionPool_(connections|connectionsCheckedOut|maxSize)|configState_indexesInCatalog|lifecycle_(indexesInInitializedState|failedDownloadIndexes_total|failedDropIndexes_total|failedInitializationIndexes_total)|search_metrics_(searchCommandTotalCount_total|vectorSearchCommandTotalCount_total|searchCommandInvalidQueries_total|vectorSearchCommandInvalidQueries_total|concurrent(Approximate|Exact|AutoEmbedding)Queries|vectorQueriesTimedOut_total)|command_(search|vectorSearch|getMore)Command(TotalLatency_seconds(_count|_sum|_max)?|Failure_total)|index_stats_(indexSizeBytes|indexStatusCode|numLuceneDocs|numLuceneMaxDocs|numFilesInIndex|requiredMemoryBytes|segment_count|largestIndexFileSizeBytes)|index_stats_indexing_(insert_total|update_total|delete_total|replicationLagMs|totalBytesProcessed_total|steadyStateExceptions_total|initialSyncExceptions_total|commitDurations_seconds(_count|_sum|_max)?)|index_stats_query_(totalQueries_total|failedQueries_total|invalidQueries_total|internallyFailedQueries_total|totalHitsCount_total|getMoreCommandCalls_total|searchResultBatchLatencies_seconds(_count|_sum|_max)?|luceneTopDocsSearchLatencies_seconds(_count|_sum|_max)?|vectorResultLatencies_seconds(_count|_sum|_max)?)|mergeScheduler_(numMerges_total|numMergesAborted_total|currentlyRunningMerges|currentlyMergingDocs|mergeTime_seconds(_count|_sum|_max)?)|replication_sessionRefresher_(sessions|failedSessionRefreshes_total)|initialsync_dispatcher_(inProgressSyncs|queuedSyncs)|indexingWorkScheduler_queued(Batches|Events)Total|decodingWorkScheduler_queued(Batches|Events)Total|rejectedConcurrentSearchExecutionCount_total)'
+              action: keep
+
+  prometheus/clickhouse:
+    config:
+      scrape_configs:
+        - job_name: clickhouse
+          scrape_interval: 30s
+          static_configs:
+            - targets:
+                - ${env:CLICKHOUSE_ENDPOINT}
+          metric_relabel_configs:
+            - source_labels: [__name__]
+              regex: 'ClickHouse(Metrics_(Query|Merge|PartMutation|BackgroundMergesAndMutationsPoolTask|BackgroundCommonPoolTask|BackgroundSchedulePoolTask|BackgroundFetchesPoolTask|TCPConnection|HTTPConnection|InterserverConnection|MemoryTracking|OpenFileForRead|OpenFileForWrite|Read|Write|DelayedInserts|DistributedSend|ReadonlyReplica|ReplicatedFetch|ReplicatedSend|ReplicatedChecks|PartsActive|PartsOutdated|MaxDDLEntryID|GlobalThreadActive|LocalThreadActive)|ProfileEvents_(Query|SelectQuery|InsertQuery|FailedQuery|FailedSelectQuery|FailedInsertQuery|QueryTimeMicroseconds|SelectQueryTimeMicroseconds|InsertQueryTimeMicroseconds|SelectedRows|SelectedBytes|SelectedParts|SelectedRanges|SelectedMarks|InsertedRows|InsertedBytes|MergedRows|MergedUncompressedBytes|Merge|MergesTimeMilliseconds|FileOpen|ReadBufferFromFileDescriptorReadBytes|WriteBufferFromFileDescriptorWriteBytes|OSCPUVirtualTimeMicroseconds|OSCPUWaitMicroseconds|OSIOWaitMicroseconds|OSReadBytes|OSWriteBytes|OSReadChars|OSWriteChars|NetworkReceiveBytes|NetworkSendBytes|ContextLock|RealTimeMicroseconds|UserTimeMicroseconds|SystemTimeMicroseconds|CompressedReadBufferBytes|UncompressedCacheHits|UncompressedCacheMisses|MarkCacheHits|MarkCacheMisses|SlowRead|ZooKeeperTransactions)|AsyncMetrics_(MemoryResident|MemoryVirtual|MemoryShared|OSMemoryAvailable|OSMemoryTotal|OSMemoryCached|LoadAverage1|LoadAverage5|LoadAverage15|Uptime|MaxPartCountForPartition|NumberOfDatabases|NumberOfTables|TotalPartsOfMergeTreeTables|TotalRowsOfMergeTreeTables|TotalBytesOfMergeTreeTables|DiskAvailable_default|DiskTotal_default|DiskUsed_default|DiskUnreserved_default|OSUserTimeNormalized|OSSystemTimeNormalized|OSIOWaitTimeNormalized|OSNiceTimeNormalized|jemalloc_resident|jemalloc_allocated|FilesystemLogsPathAvailableBytes|ReplicasMaxAbsoluteDelay|ReplicasMaxQueueSize))'
+              action: keep
+
+processors:
+  memory_limiter:
+    check_interval: 5s
+    limit_mib: 512
+    spike_limit_mib: 128
+
+  batch:
+    send_batch_size: 1500
+    timeout: 5s
+
+  resourcedetection:
+    detectors: [env, system]
+    system:
+      hostname_sources: ['os']
+
+  resource/host:
+    attributes:
+      - key: service.name
+        value: mongot-host
+        action: upsert
+
+  resource/mongot:
+    attributes:
+      - key: service.name
+        value: mongot
+        action: upsert
+
+  resource/clickhouse:
+    attributes:
+      - key: service.name
+        value: clickhouse-unnichat
+        action: upsert
+
+exporters:
+  otlp_grpc:
+    endpoint: ${env:SIGNOZ_ENDPOINT}:4317
+    tls:
+      insecure: true
+
+service:
+  pipelines:
+    metrics/host:
+      receivers: [hostmetrics]
+      processors: [memory_limiter, resourcedetection, resource/host, batch]
+      exporters: [otlp_grpc]
+
+    metrics/mongot:
+      receivers: [prometheus/mongot]
+      processors: [memory_limiter, resourcedetection, resource/mongot, batch]
+      exporters: [otlp_grpc]
+
+    metrics/clickhouse:
+      receivers: [prometheus/clickhouse]
+      processors: [memory_limiter, resourcedetection, resource/clickhouse, batch]
+      exporters: [otlp_grpc]

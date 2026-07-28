@@ -1,0 +1,24 @@
+services:
+  otel-agent:
+    image: otel/opentelemetry-collector-contrib:0.146.0
+    container_name: otel-agent-mongot
+    hostname: ${HOST_NAME:-unni-mongot}
+    restart: unless-stopped
+    command: ['--config=https://raw.githubusercontent.com/josemoura212/signoz-observability/main/agent-mongot/otel-agent-config.yaml']
+    volumes:
+      - /:/hostfs:ro
+      - /etc/passwd:/etc/passwd:ro
+    network_mode: host
+    environment:
+      HOST_PROC: /hostfs/proc
+      HOST_SYS: /hostfs/sys
+      HOST_ETC: /hostfs/etc
+      HOST_VAR: /hostfs/var
+      SIGNOZ_ENDPOINT: ${SIGNOZ_ENDPOINT}
+      MONGOT_ENDPOINT: ${MONGOT_ENDPOINT:-localhost:9946}
+      CLICKHOUSE_ENDPOINT: ${CLICKHOUSE_ENDPOINT:-172.17.0.4:9363}
+    pid: host
+    logging:
+      options:
+        max-size: '20m'
+        max-file: '3'
