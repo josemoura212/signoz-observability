@@ -84,11 +84,11 @@ processors:
         - 'IsMatch(body, ".*signoz-web\\..+\\.unnichat\\.com\\.br.*")'
         - 'IsMatch(body, ".*datadog\\.explain_statement.*")'
         - 'IsMatch(body, ".*permission denied for schema datadog.*")'
-  # Head sampling 25% — fica DEPOIS do signozspanmetrics no pipeline, entao as
+  # Head sampling 100% — fica DEPOIS do signozspanmetrics no pipeline, entao as
   # metricas APM (RPS, latencia, error rate) continuam 100% precisas; so o
   # armazenamento de traces brutos no ClickHouse e amostrado.
   probabilistic_sampler:
-    sampling_percentage: 25
+    sampling_percentage: 100
   signozspanmetrics/delta:
     metrics_exporter: signozclickhousemetrics
     metrics_flush_interval: 15s
