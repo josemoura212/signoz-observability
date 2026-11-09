@@ -15,9 +15,11 @@ processors:
     check_interval: 2s
     limit_mib: 1600
     spike_limit_mib: 400
+  # Lote pequeno: o receiver OTLP do SigNoz aceita no máximo 4 MB por mensagem gRPC; 10 mil spans passava disso.
   batch:
-    send_batch_size: 10000
-    timeout: 5s
+    send_batch_size: 1000
+    send_batch_max_size: 1000
+    timeout: 1s
 
 exporters:
   otlp_grpc:
@@ -26,7 +28,8 @@ exporters:
       insecure: true
     sending_queue:
       enabled: true
-      queue_size: 500
+      num_consumers: 16
+      queue_size: 2000
     retry_on_failure:
       enabled: true
       max_elapsed_time: 300s
