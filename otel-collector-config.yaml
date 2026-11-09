@@ -69,8 +69,10 @@ processors:
         - 'attributes["db.system"] == "mongodb" and IsMatch(name, "mongodb\\.(hello|ismaster|isMaster|buildInfo|ping|endSessions|saslStart|saslContinue).*")'
         - 'attributes["db.system"] == "redis" and IsMatch(name, "redis-(ping|info|auth|select|client).*")'
         # Pico de 07/11: 26% dos spans eram o mesmo read do Firestore em dobro e 9,5% eram pg-pool.connect.
-        # BatchGetDocuments é filho de DocumentReference.Get: cortar o filho não deixa span órfão.
+        # O BatchGetDocuments nativo do Firestore tem filhos gRPC; cortar só ele deixava esses filhos órfãos
+        # (~122 mil a cada 30 min no unnichat-server), por isso o span gRPC sai junto.
         - 'name == "BatchGetDocuments"'
+        - 'name == "grpc.google.firestore.v1.Firestore/BatchGetDocuments"'
         - 'name == "pg-pool.connect"'
   filter/logs:
     error_mode: ignore
