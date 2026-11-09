@@ -95,6 +95,24 @@ processors:
   # armazenamento de traces brutos no ClickHouse e amostrado.
   probabilistic_sampler:
     sampling_percentage: 100
+  # AI observability (v0.143+): SigNoz preenche groups e default_pricing.rules via OpAMP; ficam vazios aqui.
+  signozspanmapper:
+    groups: []
+  signozllmpricing:
+    attrs:
+      model: gen_ai.request.model
+      in: gen_ai.usage.input_tokens
+      out: gen_ai.usage.output_tokens
+      cache_read: gen_ai.usage.cache_read.input_tokens
+      cache_write: gen_ai.usage.cache_creation.input_tokens
+    default_pricing:
+      rules: []
+    output_attrs:
+      in: signoz.gen_ai.usage.input_tokens.cost
+      out: signoz.gen_ai.usage.output_tokens.cost
+      cache_read: signoz.gen_ai.usage.cache_read.input_tokens.cost
+      cache_write: signoz.gen_ai.usage.cache_write.input_tokens.cost
+      total: signoz.gen_ai.usage.tokens.cost
   signozspanmetrics/delta:
     metrics_exporter: signozclickhousemetrics
     metrics_flush_interval: 15s
@@ -180,7 +198,7 @@ service:
   pipelines:
     traces:
       receivers: [otlp]
-      processors: [memory_limiter, filter/traces, signozspanmetrics/delta, probabilistic_sampler, batch]
+      processors: [memory_limiter, filter/traces, signozspanmetrics/delta, signozspanmapper, signozllmpricing, probabilistic_sampler, batch]
       exporters: [clickhousetraces, metadataexporter, signozmeter]
     metrics:
       receivers: [otlp]
