@@ -2,7 +2,7 @@
 #
 # Papel: SO metricas de infra (hostmetrics + kafkametrics).
 # Telemetria dos consumers (traces/logs/metrics OTLP) vai DIRETO pro collector
-# principal (http://10.0.0.173:4317) — receiver otlp e pipelines de app REMOVIDOS.
+# principal (http://10.0.0.154:4317) — receiver otlp e pipelines de app REMOVIDOS.
 
 receivers:
   kafkametrics:
