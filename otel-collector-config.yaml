@@ -37,14 +37,16 @@ receivers:
                 job_name: otel-collector
 
 processors:
+  # ~80% do container de 12 GB. Em 07/11 o limite de 6,4 GB recusou ~4 milhões de spans/h no disparo.
   memory_limiter:
-    check_interval: 5s
-    limit_mib: 6400
-    spike_limit_mib: 1280
+    check_interval: 2s
+    limit_mib: 9800
+    spike_limit_mib: 1960
+  # Lote maior = menos inserts no ClickHouse e menos CPU por span no pico.
   batch:
-    send_batch_size: 3000
-    send_batch_max_size: 4000
-    timeout: 3s
+    send_batch_size: 10000
+    send_batch_max_size: 20000
+    timeout: 2s
   batch/meter:
     send_batch_max_size: 6000
     send_batch_size: 5000
@@ -66,6 +68,10 @@ processors:
         - 'attributes["http.target"] == "/ping"'
         - 'attributes["db.system"] == "mongodb" and IsMatch(name, "mongodb\\.(hello|ismaster|isMaster|buildInfo|ping|endSessions|saslStart|saslContinue).*")'
         - 'attributes["db.system"] == "redis" and IsMatch(name, "redis-(ping|info|auth|select|client).*")'
+        # Pico de 07/11: 26% dos spans eram o mesmo read do Firestore em dobro e 9,5% eram pg-pool.connect.
+        # BatchGetDocuments é filho de DocumentReference.Get: cortar o filho não deixa span órfão.
+        - 'name == "BatchGetDocuments"'
+        - 'name == "pg-pool.connect"'
   filter/logs:
     error_mode: ignore
     logs:
@@ -128,7 +134,7 @@ exporters:
     sending_queue:
       enabled: true
       num_consumers: 8
-      queue_size: 1000
+      queue_size: 100
   signozclickhousemetrics:
     dsn: tcp://clickhouse:9000/signoz_metrics
     timeout: 30s
@@ -151,12 +157,18 @@ exporters:
     timeout: 45s
     sending_queue:
       enabled: false
+  # Em 07/11 a fila dele segurou ~410 lotes (>1 milhão de spans) e levou o heap ao limite.
+  # Metadado é só autocomplete de atributo: fila curta, e se encher ele descarta em vez de prender memória.
   metadataexporter:
     cache:
       provider: in_memory
     dsn: tcp://clickhouse:9000/signoz_metadata
     enabled: true
     timeout: 45s
+    sending_queue:
+      enabled: true
+      num_consumers: 4
+      queue_size: 20
 
 service:
   telemetry:

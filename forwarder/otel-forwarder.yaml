@@ -1,0 +1,52 @@
+# Encaminhador temporário: fica no host antigo do SigNoz (10.0.0.173) depois da migração e repassa o OTLP para o
+# SigNoz novo. Existe só para que apps e agents que ainda apontam para o IP antigo não percam telemetria até cada um
+# trocar o endereço. Sai quando o tráfego dele chegar a zero (runbook docs/operations/migracao-signoz-host-proprio.md).
+receivers:
+  otlp:
+    protocols:
+      grpc:
+        endpoint: 0.0.0.0:4317
+      http:
+        endpoint: 0.0.0.0:4318
+
+processors:
+  batch:
+    send_batch_size: 10000
+    timeout: 5s
+
+exporters:
+  otlp_grpc:
+    endpoint: ${env:SIGNOZ_ENDPOINT}:4317
+    tls:
+      insecure: true
+    sending_queue:
+      enabled: true
+      queue_size: 5000
+    retry_on_failure:
+      enabled: true
+      max_elapsed_time: 300s
+
+service:
+  # Métricas do próprio encaminhador em :8888 (só localhost do host): é por elas que se vê quando o tráfego zera.
+  telemetry:
+    metrics:
+      level: basic
+      readers:
+        - pull:
+            exporter:
+              prometheus:
+                host: 0.0.0.0
+                port: 8888
+  pipelines:
+    traces:
+      receivers: [otlp]
+      processors: [batch]
+      exporters: [otlp_grpc]
+    metrics:
+      receivers: [otlp]
+      processors: [batch]
+      exporters: [otlp_grpc]
+    logs:
+      receivers: [otlp]
+      processors: [batch]
+      exporters: [otlp_grpc]

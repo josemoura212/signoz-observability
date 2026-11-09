@@ -96,12 +96,12 @@ services:
       nofile:
         soft: 262144
         hard: 262144
-    memswap_limit: 16G
+    memswap_limit: 24G
     deploy:
       resources:
         limits:
-          memory: 16G
-          cpus: '4.0'
+          memory: 24G
+          cpus: '8.0'
     healthcheck:
       test: ['CMD', 'wget', '--spider', '-q', '127.0.0.1:8123/ping']
       interval: 30s
@@ -225,15 +225,17 @@ services:
       HOST_SYS: /hostfs/sys
       HOST_ETC: /hostfs/etc
       HOST_VAR: /hostfs/var
+      # GC do Go começa a apertar antes do memory_limiter recusar dado (limit_mib igual).
+      GOMEMLIMIT: 9800MiB
     ports:
       - '4317:4317'
       - '4318:4318'
-    memswap_limit: 8G
+    memswap_limit: 12G
     deploy:
       resources:
         limits:
-          memory: 8G
-          cpus: '4.0'
+          memory: 12G
+          cpus: '6.0'
     logging:
       options:
         max-size: '50m'
