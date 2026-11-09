@@ -10,6 +10,11 @@ receivers:
         endpoint: 0.0.0.0:4318
 
 processors:
+  # Roda no host do Redis: com o SigNoz novo fora do ar, a fila não pode crescer até disputar memória com o Redis.
+  memory_limiter:
+    check_interval: 2s
+    limit_mib: 1600
+    spike_limit_mib: 400
   batch:
     send_batch_size: 10000
     timeout: 5s
@@ -21,7 +26,7 @@ exporters:
       insecure: true
     sending_queue:
       enabled: true
-      queue_size: 5000
+      queue_size: 500
     retry_on_failure:
       enabled: true
       max_elapsed_time: 300s
@@ -40,13 +45,13 @@ service:
   pipelines:
     traces:
       receivers: [otlp]
-      processors: [batch]
+      processors: [memory_limiter, batch]
       exporters: [otlp_grpc]
     metrics:
       receivers: [otlp]
-      processors: [batch]
+      processors: [memory_limiter, batch]
       exporters: [otlp_grpc]
     logs:
       receivers: [otlp]
-      processors: [batch]
+      processors: [memory_limiter, batch]
       exporters: [otlp_grpc]

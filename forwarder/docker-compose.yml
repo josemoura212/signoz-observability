@@ -6,6 +6,12 @@ services:
     command: ['--config=https://raw.githubusercontent.com/josemoura212/signoz-observability/main/forwarder/otel-forwarder.yaml']
     environment:
       SIGNOZ_ENDPOINT: ${SIGNOZ_ENDPOINT}
+    memswap_limit: 2G
+    deploy:
+      resources:
+        limits:
+          memory: 2G
+          cpus: '1.0'
     ports:
       - '4317:4317'
       - '4318:4318'
