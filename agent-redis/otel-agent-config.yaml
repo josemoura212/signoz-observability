@@ -1,51 +1,32 @@
 receivers:
-  redis:
-    endpoint: ${env:REDIS_ENDPOINT}
+  # Duas instâncias no mesmo host: socket (adapter do Socket.IO) e cache (cache, locks, claims).
+  redis/socket:
+    endpoint: ${env:REDIS_SOCKET_ENDPOINT}
+    password: ${env:REDIS_SOCKET_PASSWORD}
     collection_interval: 30s
     metrics:
       redis.maxmemory:
         enabled: true
+      redis.cmd.calls:
+        enabled: true
+      redis.cmd.usec:
+        enabled: true
       redis.cmd.latency:
         enabled: true
 
-  filelog/redis:
-    include:
-      - /host/containers/*/*-json.log
-    include_file_path: true
-    start_at: end
-    operators:
-      - type: json_parser
-        id: docker_json
-      - type: move
-        from: attributes.log
-        to: body
-      - type: move
-        from: attributes.stream
-        to: attributes["log.iostream"]
-      - type: remove
-        field: attributes.time
-      - type: regex_parser
-        if: 'body matches "^\\d+:\\w+ \\d{2} \\w+ \\d{4}"'
-        regex: '^(?P<pid>\d+):(?P<role>\w+) (?P<ts>\d{2} \w+ \d{4} \d{2}:\d{2}:\d{2}\.\d+) (?P<level>[.\-*#]) (?P<message>.*)'
-        timestamp:
-          parse_from: attributes.ts
-          layout: '02 Jan 2006 15:04:05.000'
-        severity:
-          parse_from: attributes.level
-          mapping:
-            debug: '.'
-            info: ['-', '*']
-            warn: '#'
-      - type: move
-        if: attributes.message != nil
-        from: attributes.message
-        to: body
-      - type: remove
-        if: attributes.ts != nil
-        field: attributes.ts
-      - type: remove
-        if: attributes.level != nil
-        field: attributes.level
+  redis/cache:
+    endpoint: ${env:REDIS_CACHE_ENDPOINT}
+    password: ${env:REDIS_CACHE_PASSWORD}
+    collection_interval: 30s
+    metrics:
+      redis.maxmemory:
+        enabled: true
+      redis.cmd.calls:
+        enabled: true
+      redis.cmd.usec:
+        enabled: true
+      redis.cmd.latency:
+        enabled: true
 
   hostmetrics:
     root_path: /hostfs
@@ -77,10 +58,22 @@ processors:
     system:
       hostname_sources: ['os']
 
-  resource:
+  resource/socket:
     attributes:
       - key: service.name
         value: redis
+        action: upsert
+      - key: redis.instance
+        value: socket
+        action: upsert
+
+  resource/cache:
+    attributes:
+      - key: service.name
+        value: redis
+        action: upsert
+      - key: redis.instance
+        value: cache
         action: upsert
 
 exporters:
@@ -91,12 +84,15 @@ exporters:
 
 service:
   pipelines:
-    metrics:
-      receivers: [hostmetrics, redis]
-      processors: [memory_limiter, resourcedetection, resource, batch]
+    metrics/host:
+      receivers: [hostmetrics]
+      processors: [memory_limiter, resourcedetection, batch]
       exporters: [otlp_grpc]
-
-    logs:
-      receivers: [filelog/redis]
-      processors: [memory_limiter, resourcedetection, resource, batch]
+    metrics/redis-socket:
+      receivers: [redis/socket]
+      processors: [memory_limiter, resourcedetection, resource/socket, batch]
+      exporters: [otlp_grpc]
+    metrics/redis-cache:
+      receivers: [redis/cache]
+      processors: [memory_limiter, resourcedetection, resource/cache, batch]
       exporters: [otlp_grpc]

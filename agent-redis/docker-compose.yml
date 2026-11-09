@@ -8,14 +8,16 @@ services:
     volumes:
       - /:/hostfs:ro
       - /etc/passwd:/etc/passwd:ro
-      - /var/lib/docker/containers:/host/containers:ro
     environment:
       HOST_PROC: /hostfs/proc
       HOST_SYS: /hostfs/sys
       HOST_ETC: /hostfs/etc
       HOST_VAR: /hostfs/var
-      SIGNOZ_ENDPOINT: ${SIGNOZ_ENDPOINT}
-      REDIS_ENDPOINT: ${REDIS_ENDPOINT:-host.docker.internal:6379}
+      SIGNOZ_ENDPOINT: ${SIGNOZ_ENDPOINT:?defina SIGNOZ_ENDPOINT}
+      REDIS_SOCKET_ENDPOINT: ${REDIS_SOCKET_ENDPOINT:-host.docker.internal:6379}
+      REDIS_SOCKET_PASSWORD: ${REDIS_SOCKET_PASSWORD:?defina REDIS_SOCKET_PASSWORD}
+      REDIS_CACHE_ENDPOINT: ${REDIS_CACHE_ENDPOINT:-host.docker.internal:6377}
+      REDIS_CACHE_PASSWORD: ${REDIS_CACHE_PASSWORD:?defina REDIS_CACHE_PASSWORD}
     extra_hosts:
       - 'host.docker.internal:host-gateway'
     pid: host
