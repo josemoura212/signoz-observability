@@ -1,6 +1,6 @@
 services:
   init-clickhouse:
-    image: clickhouse/clickhouse-server:25.5.6
+    image: clickhouse/clickhouse-server:${CLICKHOUSE_VERSION:-25.5.6}
     container_name: signoz-init-clickhouse
     networks:
       - signoz-net
@@ -60,7 +60,7 @@ services:
         max-file: '3'
 
   clickhouse:
-    image: clickhouse/clickhouse-server:25.5.6
+    image: clickhouse/clickhouse-server:${CLICKHOUSE_VERSION:-25.5.6}
     container_name: signoz-clickhouse
     restart: unless-stopped
     tty: true
