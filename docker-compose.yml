@@ -113,7 +113,7 @@ services:
         max-file: '3'
 
   signoz:
-    image: signoz/signoz:${SIGNOZ_VERSION:-v0.113.0}
+    image: signoz/signoz:${SIGNOZ_VERSION:-v0.121.1}
     container_name: signoz
     restart: unless-stopped
     networks:
@@ -135,7 +135,8 @@ services:
       SIGNOZ_ALERTMANAGER_PROVIDER: signoz
       SIGNOZ_TELEMETRYSTORE_CLICKHOUSE_DSN: tcp://clickhouse:9000
       SIGNOZ_SQLSTORE_SQLITE_PATH: /var/lib/signoz/signoz.db
-      SIGNOZ_TOKENIZER_JWT_SECRET: ${SIGNOZ_JWT_SECRET:-changeme}
+      # Sem default: um segredo conhecido deixa qualquer um forjar sessão no SigNoz.
+      SIGNOZ_TOKENIZER_JWT_SECRET: ${SIGNOZ_JWT_SECRET:?defina SIGNOZ_JWT_SECRET nas variáveis da stack}
     healthcheck:
       test: ['CMD', 'wget', '--spider', '-q', 'localhost:8080/api/v1/health']
       interval: 30s
