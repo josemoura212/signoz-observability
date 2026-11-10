@@ -33,6 +33,7 @@ processors:
 
   batch:
     send_batch_size: 1500
+    send_batch_max_size: 1500
     timeout: 5s
 
 exporters:
