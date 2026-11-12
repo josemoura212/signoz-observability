@@ -1,5 +1,6 @@
 receivers:
-  # Duas instâncias no mesmo host: socket (adapter do Socket.IO) e cache (cache, locks, claims).
+  # Três instâncias no mesmo host: socket (adapter do Socket.IO), cache (cache, locks, claims) e
+  # delay (fila dos delays de até 10 s, AOF, maxmemory 1 GB, noeviction).
   redis/socket:
     endpoint: ${env:REDIS_SOCKET_ENDPOINT}
     password: ${env:REDIS_SOCKET_PASSWORD}
@@ -17,6 +18,20 @@ receivers:
   redis/cache:
     endpoint: ${env:REDIS_CACHE_ENDPOINT}
     password: ${env:REDIS_CACHE_PASSWORD}
+    collection_interval: 30s
+    metrics:
+      redis.maxmemory:
+        enabled: true
+      redis.cmd.calls:
+        enabled: true
+      redis.cmd.usec:
+        enabled: true
+      redis.cmd.latency:
+        enabled: true
+
+  redis/delay:
+    endpoint: ${env:REDIS_DELAY_ENDPOINT}
+    password: ${env:REDIS_DELAY_PASSWORD}
     collection_interval: 30s
     metrics:
       redis.maxmemory:
@@ -76,6 +91,15 @@ processors:
         value: cache
         action: upsert
 
+  resource/delay:
+    attributes:
+      - key: service.name
+        value: redis
+        action: upsert
+      - key: redis.instance
+        value: delay
+        action: upsert
+
 exporters:
   otlp_grpc:
     endpoint: ${env:SIGNOZ_ENDPOINT}:4317
@@ -95,4 +119,8 @@ service:
     metrics/redis-cache:
       receivers: [redis/cache]
       processors: [memory_limiter, resourcedetection, resource/cache, batch]
+      exporters: [otlp_grpc]
+    metrics/redis-delay:
+      receivers: [redis/delay]
+      processors: [memory_limiter, resourcedetection, resource/delay, batch]
       exporters: [otlp_grpc]
